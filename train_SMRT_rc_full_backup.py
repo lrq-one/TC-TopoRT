@@ -128,7 +128,7 @@ if __name__ == '__main__':
     batch_size = 64
     num_works = 2
     lr = 1e-5
-    epochs = 10
+    epochs = 150
     test_batch = 64
 
     randint = 1

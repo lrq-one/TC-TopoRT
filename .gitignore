@@ -1,0 +1,8 @@
+*.pyc
+*.txt
+*.log
+*.json
+*.csv
+*.pt
+*.pkl
+__pycache__/
