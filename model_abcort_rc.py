@@ -486,7 +486,7 @@ class MyNet(nn.Module):
             g = data.global_feat.float().to(result.device)
             g = self.global_proj(g)
             gate = self.global_gate(torch.cat([result, g], dim=-1))
-            result = result + gate * g
+            result = result + 0.1 * gate * g
 
         out = self.out_lin(result)
 
