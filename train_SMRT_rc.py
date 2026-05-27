@@ -45,6 +45,7 @@ class Trainer(object):
 
             self.optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
             self.optimizer.step()
             total_loss += loss.item()
         self.scheduler.step()
@@ -176,7 +177,7 @@ if __name__ == '__main__':
 
     model.to(device=device)
 
-    mae_test_best = 40
+    mae_test_best = 999999.0
     best_model_path = './model_dict/best_model_SMRT_rc.pkl'
     results_dir = './results/SMRT_rc'
     os.makedirs(results_dir, exist_ok=True)
