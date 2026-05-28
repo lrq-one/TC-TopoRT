@@ -100,7 +100,9 @@ class TopoCellRTTrainDataset(InMemoryDataset):
 
     def process(self):
 
-        res = pd.read_csv("./SMRT_data/data/SMRT_train.csv")
+        train_csv = os.environ.get("TOPOCELLRT_TRAIN_CSV", "./SMRT_data/data/SMRT_train.csv")
+        print("loading train csv:", train_csv)
+        res = pd.read_csv(train_csv)
         y = res['rt']
         smile_list = res['smile']
         data_list = []
@@ -164,7 +166,9 @@ class TopoCellRTTestDataset(InMemoryDataset):
 
 
     def process(self):
-        res = pd.read_csv("./SMRT_data/data/SMRT_test.csv")
+        test_csv = os.environ.get("TOPOCELLRT_TEST_CSV", "./SMRT_data/data/SMRT_test.csv")
+        print("loading test csv:", test_csv)
+        res = pd.read_csv(test_csv)
         y = res['rt']
         smile_list = res['smile']
         succ_inchi, succ_rt, success_index, atom_feature,edge_index,edge_attr = build_atom_bond_graph_features(smile_list,y,type=0)

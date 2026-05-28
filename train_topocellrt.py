@@ -135,7 +135,8 @@ if __name__ == '__main__':
 
     set_reproducible_seed(randint)
     print("loading... get SMRT train data feature")
-    dataset_train = TopoCellRTTrainDataset('./SMRT_data/reload/SMRT_train')
+    train_root = os.environ.get("TOPOCELLRT_TRAIN_ROOT", "./SMRT_data/reload/SMRT_train")
+    dataset_train = TopoCellRTTrainDataset(train_root)
 
     train_len = dataset_train.__len__()
     train_len2 = int(dataset_train.__len__() * 0.9)
@@ -145,7 +146,8 @@ if __name__ == '__main__':
     train_dataset, val_dataset = random_split(dataset_train, [train_len2, val_len], generator=generator)
 
     print("loading... get SMRT test data feature")
-    dataset_test = TopoCellRTTestDataset('./SMRT_data/reload/SMRT_test')
+    test_root = os.environ.get("TOPOCELLRT_TEST_ROOT", "./SMRT_data/reload/SMRT_test")
+    dataset_test = TopoCellRTTestDataset(test_root)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
                               num_workers=num_works, pin_memory=True,
@@ -178,11 +180,13 @@ if __name__ == '__main__':
     model.to(device=device)
 
     val_mae_best = 999999.0
-    best_model_path = './model_dict/best_model_TopoCellRT.pkl'
-    results_dir = './results/TopoCellRT'
+    best_model_path = os.environ.get("TOPOCELLRT_BEST_CKPT", "./model_dict/best_model_TopoCellRT.pkl")
+    results_dir = os.environ.get("TOPOCELLRT_RESULT_DIR", "./results/TopoCellRT")
     os.makedirs(results_dir, exist_ok=True)
 
-    with open('./results/TopoCellRT_result.txt', 'a') as f:
+    result_txt = os.environ.get("TOPOCELLRT_RESULT_TXT", "./results/TopoCellRT_result.txt")
+    os.makedirs(os.path.dirname(result_txt), exist_ok=True)
+    with open(result_txt, "a") as f:
         for epoch in range(epochs):
             model.train()
             try:
