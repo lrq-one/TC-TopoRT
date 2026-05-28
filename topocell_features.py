@@ -5,10 +5,10 @@ import rdkit.Chem as Chem
 import pickle
 from tqdm import *
 from rdkit import  Chem
-from feature_ops import atom_featurizer,bond_featurizer
+from chem_feature_ops import atom_featurizer, bond_featurizer
 import torch
 
-def get_AtomBond_feature(inchis, y,type):
+def build_atom_bond_graph_features(inchis, y,type):
 
     succ_inchis = []
     succ_index = []
@@ -30,7 +30,6 @@ def get_AtomBond_feature(inchis, y,type):
             node_features = np.array([atom_featurizer(atom) for atom in mol.GetAtoms()], dtype='float32')
             x1= torch.tensor(node_features, dtype=torch.float32)
 
-            
             row, col, edge_feat = [], [], []
             for bond in mol.GetBonds():
                 start, end = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
@@ -42,7 +41,7 @@ def get_AtomBond_feature(inchis, y,type):
 
             edge_index = torch.tensor([row, col], dtype=torch.long)
             edge_attr = torch.tensor(np.array(edge_feat), dtype=torch.float32)
-            
+
         except:
             print(str(INDEX)+" error")
             continue
@@ -56,7 +55,7 @@ def get_AtomBond_feature(inchis, y,type):
     return succ_inchis, succ_rt, succ_index, atom_feature,edge_index_all,edge_attr_all
 
 # if __name__ == '__main__':
-    
+
 #     res = pd.read_excel('./data/UniToyama_Atlantis_143.xlsx')
 #     y = res['RT']
 #     inchi_list = res['InChI']
@@ -65,18 +64,11 @@ def get_AtomBond_feature(inchis, y,type):
 #     text_txt = './data_information/UniToyama_Atlantis_143/atom_feature_noH.txt'
 #     with open(text_txt, 'wb') as text:
 #         pickle.dump(atom_feature, text)
-        
+
 #     text_txt2='./data_information/UniToyama_Atlantis_143/edge_index_noH.txt'
 #     with open(text_txt2, 'wb') as text:
 #         pickle.dump(edge_index_all, text)
-        
+
 #     text_txt3='./data_information/UniToyama_Atlantis_143/edge_attr_noH.txt'
 #     with open(text_txt3, 'wb') as text:
 #         pickle.dump(edge_attr_all, text)
-
-
-
-
-
-
-

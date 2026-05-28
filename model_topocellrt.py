@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from torch_geometric.nn import MessagePassing, global_add_pool, TransformerConv, HypergraphConv
+from torch_geometric.nn import MessagePassing, global_add_pool
 from torch import nn
 import torch.nn.functional as F
 from torch_geometric.nn import global_add_pool, MessagePassing
@@ -38,7 +38,7 @@ from torch_geometric.nn.inits import glorot, zeros
 from torch_geometric.utils import scatter, softmax
 
 
-class HypergraphConv(MessagePassing):
+class DualCellBondConv(MessagePassing):
 
     def __init__(
         self,
@@ -166,7 +166,7 @@ class HypergraphConv(MessagePassing):
         return out
 
 
-class TransformerConv(MessagePassing):
+class AtomBondAttentionConv(MessagePassing):
 
     _alpha: OptTensor
 
@@ -281,7 +281,7 @@ class TransformerConv(MessagePassing):
                 f'{self.out_channels}, heads={self.heads})')
 
 
-class RingCellRefine(nn.Module):
+class RingEdgeCellRefiner(nn.Module):
     def __init__(self, emb_dim, aux_dim=9, init_scale=0.05):
         super().__init__()
 
@@ -317,18 +317,18 @@ class RingCellRefine(nn.Module):
         return edge_h + torch.tanh(self.scale) * gate * delta
 
 
-class GraphTransformerBlock(nn.Module):
+class TopoCellRTBlock(nn.Module):
     def __init__(self, in_channels, out_channels, heads=4, edge_dim=11, dropout=0.3, **kwargs):
-        super(GraphTransformerBlock, self).__init__(**kwargs)
+        super(TopoCellRTBlock, self).__init__(**kwargs)
         self.edge_dim = edge_dim
         self.in_channels = in_channels
         self.out_channels = out_channels
 
-        self.conv = TransformerConv(in_channels, out_channels, heads=heads, edge_dim=edge_dim, beta=True, dropout=0, concat=True,)
+        self.conv = AtomBondAttentionConv(in_channels, out_channels, heads=heads, edge_dim=edge_dim, beta=True, dropout=0, concat=True,)
         self.BatchNorm = nn.BatchNorm1d(out_channels)
-        self.conv2 = HypergraphConv(in_channels, out_channels)
+        self.conv2 = DualCellBondConv(in_channels, out_channels)
         self.BatchNorm2 = nn.BatchNorm1d(out_channels)
-        self.ring_refine = RingCellRefine(out_channels, aux_dim=9, init_scale=0.05)
+        self.ring_refine = RingEdgeCellRefiner(out_channels, aux_dim=9, init_scale=0.05)
 
     def DHT(self, edge_index, batch, add_loops=False):
 
@@ -372,9 +372,9 @@ class GraphTransformerBlock(nn.Module):
         return x_gat, edge_attr
 
 
-class MyNet(nn.Module):
+class TopoCellRTNet(nn.Module):
     def __init__(self, emb_dim=256, feat_dim=256, edge_dim=256, temp_dim=256, heads=8, drop_ratio=0, pool='add'):
-        super(MyNet, self).__init__()
+        super(TopoCellRTNet, self).__init__()
         self.emb_dim = emb_dim
         self.feat_dim = feat_dim
         self.drop_ratio = drop_ratio
@@ -384,12 +384,12 @@ class MyNet(nn.Module):
         self.in_node = nn.Linear(46, emb_dim)
         self.in_edge = nn.Linear(21, emb_dim)
 
-        self.conv1 = GraphTransformerBlock(emb_dim, emb_dim, heads=heads, edge_dim=edge_dim)
-        self.conv2 = GraphTransformerBlock(emb_dim, emb_dim, heads=heads, edge_dim=edge_dim)
-        self.conv3 = GraphTransformerBlock(emb_dim, emb_dim, heads=heads, edge_dim=edge_dim)
-        self.conv4 = GraphTransformerBlock(emb_dim, emb_dim, heads=heads, edge_dim=edge_dim)
-        self.conv5 = GraphTransformerBlock(emb_dim, emb_dim, heads=heads, edge_dim=edge_dim)
-        self.conv6 = GraphTransformerBlock(emb_dim, emb_dim, heads=heads, edge_dim=edge_dim)
+        self.conv1 = TopoCellRTBlock(emb_dim, emb_dim, heads=heads, edge_dim=edge_dim)
+        self.conv2 = TopoCellRTBlock(emb_dim, emb_dim, heads=heads, edge_dim=edge_dim)
+        self.conv3 = TopoCellRTBlock(emb_dim, emb_dim, heads=heads, edge_dim=edge_dim)
+        self.conv4 = TopoCellRTBlock(emb_dim, emb_dim, heads=heads, edge_dim=edge_dim)
+        self.conv5 = TopoCellRTBlock(emb_dim, emb_dim, heads=heads, edge_dim=edge_dim)
+        self.conv6 = TopoCellRTBlock(emb_dim, emb_dim, heads=heads, edge_dim=edge_dim)
 
         self.graphline = nn.Linear(emb_dim * 7, emb_dim * 2)
 

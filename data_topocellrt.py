@@ -1,14 +1,13 @@
-
 from typing import  Union, List, Tuple
 import pandas as pd
 import torch
 from torch_geometric.data import Data, InMemoryDataset
 import os
 import pickle
-from get_feature import get_AtomBond_feature
+from topocell_features import build_atom_bond_graph_features
 
 
-def compute_global_feat(smiles):
+def compute_topocell_context(smiles):
     from rdkit import Chem
     from rdkit.Chem import Descriptors, Crippen, Lipinski, rdMolDescriptors
 
@@ -71,20 +70,22 @@ def compute_global_feat(smiles):
     )
 
     return torch.tensor(feat[:24], dtype=torch.float32), torch.tensor([hard_flag], dtype=torch.float32)
-class SMRT_Dataset_Load_train(InMemoryDataset):
+
+
+class TopoCellRTTrainDataset(InMemoryDataset):
     def __init__(self, root, transform=None, pre_transform=None, pre_filter=None):
         super().__init__(root, transform, pre_transform, pre_filter)
         self.data, self.slices = torch.load(self.processed_paths[0])
     @property
     def raw_dir(self) -> str:
         return os.path.join(self.root, 'raw')
-    
+
 
     @property
     def processed_dir(self) -> str:
         return os.path.join(self.root, 'processed')
 
-    
+
     @property
     def raw_file_names(self) -> Union[str, List[str], Tuple]:
         return 'SMRT_train.csv'
@@ -98,19 +99,18 @@ class SMRT_Dataset_Load_train(InMemoryDataset):
 
 
     def process(self):
-        
+
         res = pd.read_csv("./SMRT_data/data/SMRT_train.csv")
         y = res['rt']
         smile_list = res['smile']
         data_list = []
-        succ_inchi, succ_rt, success_index, atom_feature,edge_index,edge_attr = get_AtomBond_feature(smile_list, y,type=0)
-
+        succ_inchi, succ_rt, success_index, atom_feature,edge_index,edge_attr = build_atom_bond_graph_features(smile_list, y,type=0)
 
         for k, raw_index in enumerate(success_index):
             smile = smile_list.iloc[raw_index]
             rt = float(res['rt'].iloc[raw_index])
 
-            global_feat, hard_flag = compute_global_feat(smile)
+            global_feat, hard_flag = compute_topocell_context(smile)
 
             data = Data(
                 x=atom_feature[k],
@@ -123,7 +123,6 @@ class SMRT_Dataset_Load_train(InMemoryDataset):
             )
             data_list.append(data)
 
-
         print(data_list.__len__())
         if self.pre_filter is not None:
             data_list = [data for data in data_list if self.pre_filter(data)]
@@ -132,10 +131,11 @@ class SMRT_Dataset_Load_train(InMemoryDataset):
             data_list = [self.pre_transform(data) for data in data_list]
 
         data, slices = self.collate(data_list)
-       
+
         torch.save((data, slices), self.processed_paths[0])
 
-class SMRT_Dataset_Load_test(InMemoryDataset):
+
+class TopoCellRTTestDataset(InMemoryDataset):
     def __init__(self, root, transform=None, pre_transform=None, pre_filter=None):
         super().__init__(root, transform, pre_transform, pre_filter)
         self.data, self.slices = torch.load(self.processed_paths[0])
@@ -144,13 +144,13 @@ class SMRT_Dataset_Load_test(InMemoryDataset):
     @property
     def raw_dir(self) -> str:
         return os.path.join(self.root, 'raw')
-    
+
 
     @property
     def processed_dir(self) -> str:
         return os.path.join(self.root, 'processed')
 
-    
+
     @property
     def raw_file_names(self) -> Union[str, List[str], Tuple]:
         return 'SMRT_test.csv'
@@ -167,13 +167,13 @@ class SMRT_Dataset_Load_test(InMemoryDataset):
         res = pd.read_csv("./SMRT_data/data/SMRT_test.csv")
         y = res['rt']
         smile_list = res['smile']
-        succ_inchi, succ_rt, success_index, atom_feature,edge_index,edge_attr = get_AtomBond_feature(smile_list,y,type=0)
+        succ_inchi, succ_rt, success_index, atom_feature,edge_index,edge_attr = build_atom_bond_graph_features(smile_list,y,type=0)
         data_list = []
         for k, raw_index in enumerate(success_index):
             smile = smile_list.iloc[raw_index]
             rt = float(res['rt'].iloc[raw_index])
 
-            global_feat, hard_flag = compute_global_feat(smile)
+            global_feat, hard_flag = compute_topocell_context(smile)
 
             data = Data(
                 x=atom_feature[k],
@@ -192,18 +192,15 @@ class SMRT_Dataset_Load_test(InMemoryDataset):
 
         if self.pre_filter is not None:
             data_list = [self.pre_transform(data) for data in data_list]
-        data, slices = self.collate(data_list) 
+        data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
+
+
 if __name__ == '__main__':
 
     print('Loading ...get SMRT train feature')
-    dataset1 =SMRT_Dataset_Load_train('./SMRT_data/reload/SMRT_train')
+    dataset1 = TopoCellRTTrainDataset('./SMRT_data/reload/SMRT_train')
     print('Number of graphs in dataset: ', len(dataset1))
     print('Loading ...get SMRT test feature')
-    dataset2 = SMRT_Dataset_Load_test('./SMRT_data/reload/SMRT_test')
+    dataset2 = TopoCellRTTestDataset('./SMRT_data/reload/SMRT_test')
     print('Number of graphs in dataset: ', len(dataset2))
-
-
-
-
-
