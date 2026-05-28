@@ -172,7 +172,7 @@ def car_contrastive_loss(
 
 
 class TopoCellRTCARTrainer(object):
-    def __init__(self, model, base_lr, contrast_lr, device, lambda_car_max=0.08, warmup_epochs=10):
+    def __init__(self, model, base_lr, contrast_lr, device, lambda_car_max=0.04, warmup_epochs=10):
         self.model = model
         self.device = device
         self.lambda_car_max = lambda_car_max
@@ -193,6 +193,9 @@ class TopoCellRTCARTrainer(object):
         self.scheduler = CosineAnnealingWarmRestarts(self.optimizer, 60)
 
     def train_one_epoch(self, data_loader, epoch, fp_cache):
+        self.model.train()
+        freeze_batchnorm_stats(self.model)
+
         total_reg_loss = 0.0
         total_car_loss = 0.0
         total_pos_pairs = 0
@@ -213,11 +216,9 @@ class TopoCellRTCARTrainer(object):
                 reduction="none",
             )
 
-            if hasattr(data, "hard_flag"):
-                w = 1.0 + 0.3 * data.hard_flag.view(-1).to(loss_each.device)
-                reg_loss = (loss_each * w).mean()
-            else:
-                reg_loss = loss_each.mean()
+            # CAR 阶段不再使用 hard_flag 加权：
+            # 之前诊断发现 hard_flag 几乎全为 1，区分度很低，反而会放大微调扰动。
+            reg_loss = loss_each.mean()
 
             batch_fps = get_batch_fps(data.smiles, fp_cache, device=z.device)
             car_loss, pos_pairs, neg_pairs = car_contrastive_loss(z, y, batch_fps)
@@ -289,6 +290,18 @@ def set_reproducible_seed(seed):
     torch.cuda.manual_seed_all(seed)
 
 
+def freeze_batchnorm_stats(model):
+    """
+    CAR 使用 scaffold-aware batch，batch 分布不是普通随机分布。
+    微调时必须冻结 BatchNorm running mean/var，否则会快速破坏预训练 best checkpoint。
+    """
+    for m in model.modules():
+        if isinstance(m, torch.nn.modules.batchnorm._BatchNorm):
+            m.eval()
+            for p in m.parameters():
+                p.requires_grad_(False)
+
+
 def summarize_retention_errors(y_true, y_pred):
     abs_err = torch.abs(y_true - y_pred)
     p95 = torch.quantile(abs_err, 0.95).item()
@@ -320,7 +333,7 @@ def save_retention_predictions(path, y_true, y_pred):
 if __name__ == '__main__':
     batch_size = 64
     num_works = 2
-    base_lr = 2e-6
+    base_lr = 5e-7
     contrast_lr = 5e-5
     epochs = 60
     test_batch = 64
