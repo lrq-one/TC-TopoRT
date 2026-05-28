@@ -38,28 +38,41 @@ class ScaffoldBatchSampler(Sampler):
             if self.shuffle:
                 rng.shuffle(pools[k])
 
-        available = [k for k, v in pools.items() if v]
+        available = [k for k, v in pools.items() if len(v) > 0]
 
         while available:
             if self.shuffle:
                 rng.shuffle(available)
+
             selected = available[:self.groups_per_batch]
             batch = []
 
+            # 先从选中的 scaffold 里各取若干个
             for k in selected:
-                for _ in range(self.samples_per_group):
-                    if pools[k]:
-                        batch.append(pools[k].pop())
-                    else:
-                        break
+                take_n = min(self.samples_per_group, len(pools[k]))
+                for _ in range(take_n):
+                    batch.append(pools[k].pop())
 
+            # 关键修复：selected 之后，必须立刻移除已经空的 scaffold
+            available = [k for k in available if len(pools[k]) > 0]
+
+            # 再随机补齐 batch；每次 pop 前都检查非空
+            safety = 0
             while len(batch) < self.batch_size and available:
-                k = rng.choice(available)
-                batch.append(pools[k].pop())
-                if not pools[k]:
-                    available.remove(k)
+                safety += 1
+                if safety > self.batch_size * 10:
+                    break
 
-            available = [k for k in available if pools[k]]
+                k = rng.choice(available)
+
+                if len(pools[k]) == 0:
+                    available = [kk for kk in available if len(pools[kk]) > 0]
+                    continue
+
+                batch.append(pools[k].pop())
+
+                if len(pools[k]) == 0:
+                    available = [kk for kk in available if len(pools[kk]) > 0]
 
             if batch:
                 yield batch
