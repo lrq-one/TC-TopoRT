@@ -115,6 +115,229 @@ def build_scaffold_groups(smiles_list):
     return groups
 
 
+
+def build_pair_banks(
+    train_smiles,
+    train_rts,
+    scaffold_groups,
+    fp_cache,
+    seed=1,
+    pos_struct_min=0.45,
+    pos_rt_delta=50.0,
+    neg_struct_min=0.65,
+    neg_rt_delta=300.0,
+    max_group_size=320,
+    max_pairs_per_group=800,
+):
+    """
+    构建显式 pair bank，不删除任何官方数据，只生成训练辅助 pair。
+
+    positive pair:
+        Tanimoto >= pos_struct_min and |RT_i - RT_j| <= pos_rt_delta
+
+    conflict negative pair:
+        Tanimoto >= neg_struct_min and |RT_i - RT_j| >= neg_rt_delta
+
+    注意：
+    - 只在同 Murcko scaffold group 内找 pair，避免全量 63k^2 爆炸；
+    - 大 scaffold group 只取低 RT / 高 RT / 随机混合子集，优先捕捉 RT 冲突；
+    - 返回的 index 是 train_dataset 的局部 index，可直接给 batch_sampler 使用。
+    """
+    rng = random.Random(seed)
+
+    positive_pairs = []
+    conflict_pairs = []
+
+    group_items = list(scaffold_groups.items())
+    print("building explicit positive/conflict pair banks from scaffold groups...")
+
+    for scaffold, indices in tqdm(group_items):
+        if len(indices) < 2:
+            continue
+
+        cand = list(indices)
+
+        # 大 scaffold group 不能做完整 O(n^2)，优先保留 RT 两端样本，最容易产生 conflict pair
+        if len(cand) > max_group_size:
+            cand_sorted = sorted(cand, key=lambda i: float(train_rts[i]))
+
+            n_edge = max_group_size // 3
+            low = cand_sorted[:n_edge]
+            high = cand_sorted[-n_edge:]
+
+            chosen = set(low + high)
+            rest = [i for i in cand if i not in chosen]
+            rng.shuffle(rest)
+
+            need = max_group_size - len(chosen)
+            cand = low + high + rest[:max(0, need)]
+
+        if len(cand) < 2:
+            continue
+
+        fps = torch.stack([fp_cache[train_smiles[i]] for i in cand], dim=0).float()
+        sim = tanimoto_matrix(fps).cpu().numpy()
+
+        rt = np.array([float(train_rts[i]) for i in cand], dtype=np.float32)
+        rt_diff = np.abs(rt[:, None] - rt[None, :])
+
+        n = len(cand)
+        triu = np.triu(np.ones((n, n), dtype=bool), k=1)
+
+        pos_mask = (
+            triu
+            & (sim >= pos_struct_min)
+            & (rt_diff <= pos_rt_delta)
+        )
+
+        neg_mask = (
+            triu
+            & (sim >= neg_struct_min)
+            & (rt_diff >= neg_rt_delta)
+        )
+
+        pos_ij = np.argwhere(pos_mask)
+        neg_ij = np.argwhere(neg_mask)
+
+        if len(pos_ij) > max_pairs_per_group:
+            keep = rng.sample(range(len(pos_ij)), max_pairs_per_group)
+            pos_ij = pos_ij[keep]
+
+        if len(neg_ij) > max_pairs_per_group:
+            keep = rng.sample(range(len(neg_ij)), max_pairs_per_group)
+            neg_ij = neg_ij[keep]
+
+        for a, b in pos_ij:
+            positive_pairs.append((int(cand[a]), int(cand[b])))
+
+        for a, b in neg_ij:
+            conflict_pairs.append((int(cand[a]), int(cand[b])))
+
+    rng.shuffle(positive_pairs)
+    rng.shuffle(conflict_pairs)
+
+    return positive_pairs, conflict_pairs
+
+
+class ConflictPairBatchSampler(Sampler):
+    """
+    每个 batch 强制放入若干 conflict negative pairs。
+
+    目标：
+        让 neg_pairs 从 CAR-v1 的 ~0.4/batch 提高到 8-20+/batch。
+
+    注意：
+        这里是有放回采样，不保证每个 epoch 每个样本只出现一次。
+        这是有意设计，因为 CAR 微调重点不是完整遍历训练集，
+        而是让 batch 中稳定出现冲突 pair。
+    """
+    def __init__(
+        self,
+        num_samples,
+        conflict_pairs,
+        positive_pairs,
+        batch_size,
+        conflict_pairs_per_batch=12,
+        positive_pairs_per_batch=8,
+        seed=1,
+        num_batches=None,
+        shuffle=True,
+    ):
+        self.num_samples = int(num_samples)
+        self.conflict_pairs = [tuple(map(int, p)) for p in conflict_pairs]
+        self.positive_pairs = [tuple(map(int, p)) for p in positive_pairs]
+        self.batch_size = int(batch_size)
+        self.conflict_pairs_per_batch = int(conflict_pairs_per_batch)
+        self.positive_pairs_per_batch = int(positive_pairs_per_batch)
+        self.seed = int(seed)
+        self.shuffle = shuffle
+        self.epoch = 0
+        self.num_batches = int(np.ceil(self.num_samples / self.batch_size)) if num_batches is None else int(num_batches)
+
+    def __iter__(self):
+        rng = random.Random(self.seed + self.epoch)
+        self.epoch += 1
+
+        conflict_pairs = list(self.conflict_pairs)
+        positive_pairs = list(self.positive_pairs)
+
+        if self.shuffle:
+            rng.shuffle(conflict_pairs)
+            rng.shuffle(positive_pairs)
+
+        cp = 0
+        pp = 0
+
+        for _ in range(self.num_batches):
+            batch = []
+            used = set()
+
+            # 1) 强制加入 conflict pairs
+            for _ in range(self.conflict_pairs_per_batch):
+                if not conflict_pairs:
+                    break
+
+                if cp >= len(conflict_pairs):
+                    cp = 0
+                    if self.shuffle:
+                        rng.shuffle(conflict_pairs)
+
+                i, j = conflict_pairs[cp]
+                cp += 1
+
+                if i not in used and len(batch) < self.batch_size:
+                    batch.append(i)
+                    used.add(i)
+
+                if j not in used and len(batch) < self.batch_size:
+                    batch.append(j)
+                    used.add(j)
+
+            # 2) 加入 positive pairs，保留稳定结构-RT一致性
+            for _ in range(self.positive_pairs_per_batch):
+                if not positive_pairs:
+                    break
+
+                if pp >= len(positive_pairs):
+                    pp = 0
+                    if self.shuffle:
+                        rng.shuffle(positive_pairs)
+
+                i, j = positive_pairs[pp]
+                pp += 1
+
+                if i not in used and len(batch) < self.batch_size:
+                    batch.append(i)
+                    used.add(i)
+
+                if j not in used and len(batch) < self.batch_size:
+                    batch.append(j)
+                    used.add(j)
+
+            # 3) 随机补齐 batch
+            safety = 0
+            while len(batch) < self.batch_size:
+                safety += 1
+                if safety > self.batch_size * 20:
+                    break
+
+                idx = rng.randrange(self.num_samples)
+                if idx in used:
+                    continue
+
+                batch.append(idx)
+                used.add(idx)
+
+            if self.shuffle:
+                rng.shuffle(batch)
+
+            if batch:
+                yield batch
+
+    def __len__(self):
+        return self.num_batches
+
+
 def get_batch_fps(smiles, fp_cache, device):
     if isinstance(smiles, (list, tuple)):
         fps = torch.stack([fp_cache[s] for s in smiles], dim=0)
@@ -172,7 +395,7 @@ def car_contrastive_loss(
 
 
 class TopoCellRTCARTrainer(object):
-    def __init__(self, model, base_lr, contrast_lr, device, lambda_car_max=0.04, warmup_epochs=10):
+    def __init__(self, model, base_lr, contrast_lr, device, lambda_car_max=0.03, warmup_epochs=10):
         self.model = model
         self.device = device
         self.lambda_car_max = lambda_car_max
@@ -335,7 +558,7 @@ if __name__ == '__main__':
     num_works = 2
     base_lr = 5e-7
     contrast_lr = 5e-5
-    epochs = 60
+    epochs = 30
     test_batch = 64
 
     randint = 1
@@ -355,14 +578,38 @@ if __name__ == '__main__':
     dataset_test = TopoCellRTTestDataset('./SMRT_data/reload/SMRT_test')
 
     train_smiles = [train_dataset[i].smiles for i in range(len(train_dataset))]
+    train_rts = [float(train_dataset[i].y.view(-1)[0]) for i in range(len(train_dataset))]
+
     fp_cache = build_fp_cache(train_smiles)
     scaffold_groups = build_scaffold_groups(train_smiles)
 
-    train_batch_sampler = ScaffoldBatchSampler(
-        scaffold_groups,
+    positive_pairs, conflict_pairs = build_pair_banks(
+        train_smiles=train_smiles,
+        train_rts=train_rts,
+        scaffold_groups=scaffold_groups,
+        fp_cache=fp_cache,
+        seed=randint,
+        pos_struct_min=0.45,
+        pos_rt_delta=50.0,
+        neg_struct_min=0.65,
+        neg_rt_delta=300.0,
+        max_group_size=320,
+        max_pairs_per_group=800,
+    )
+
+    print("positive pair bank:", len(positive_pairs))
+    print("conflict pair bank:", len(conflict_pairs))
+
+    if len(conflict_pairs) < 1000:
+        print("WARNING: conflict pair bank is small. Consider lowering neg_struct_min to 0.60 or neg_rt_delta to 250.")
+
+    train_batch_sampler = ConflictPairBatchSampler(
+        num_samples=len(train_dataset),
+        conflict_pairs=conflict_pairs,
+        positive_pairs=positive_pairs,
         batch_size=batch_size,
-        groups_per_batch=16,
-        samples_per_group=3,
+        conflict_pairs_per_batch=12,
+        positive_pairs_per_batch=8,
         seed=randint,
         shuffle=True,
     )
@@ -404,11 +651,11 @@ if __name__ == '__main__':
     model.to(device=device)
 
     val_mae_best = 999999.0
-    best_model_path = './model_dict/best_model_TopoCellRT_CAR.pkl'
-    results_dir = './results/TopoCellRT_CAR'
+    best_model_path = './model_dict/best_model_TopoCellRT_CARv2.pkl'
+    results_dir = './results/TopoCellRT_CARv2'
     os.makedirs(results_dir, exist_ok=True)
 
-    with open('./results/TopoCellRT_CAR_result.txt', 'a') as f:
+    with open('./results/TopoCellRT_CARv2_result.txt', 'a') as f:
         for epoch in range(epochs):
             model.train()
             try:
