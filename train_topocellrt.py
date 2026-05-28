@@ -191,7 +191,7 @@ if __name__ == '__main__':
                 model.eval()
                 mae_train, mre_train, medAE_train, medRE_train, r2_train = evaluator.evaluate_retention(train_loader)
                 val_mae, val_mre, val_medAE, val_medRE, val_r2 = evaluator.evaluate_retention(val_loader)
-                print(f'epoch:{epoch}\ttrain_loss:{mae_train}\tmre_train:{mre_train}\tmedAE_train:{medAE_train}\tmedRE_train:{medRE_train}\tr2_train:{r2_train}')
+                print(f'epoch:{epoch}\ttrain_mae:{mae_train}\tmre_train:{mre_train}\tmedAE_train:{medAE_train}\tmedRE_train:{medRE_train}\tr2_train:{r2_train}')
                 print(f'epoch:{epoch}\tval_mae:{val_mae}\tval_mre:{val_mre}\tval_medAE:{val_medAE}\tval_medRE:{val_medRE}\tval_r2:{val_r2}')
                 f.write(f'epoch:{epoch}\tval_mae:{val_mae}\tval_mre:{val_mre}\tval_medAE:{val_medAE}\tval_medRE:{val_medRE}\tval_r2:{val_r2}\n')
                 f.flush()
