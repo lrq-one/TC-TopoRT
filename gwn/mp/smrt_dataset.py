@@ -10,6 +10,7 @@ from typing import Union, List
 import rdkit.Chem as Chem
 from rdkit.Chem import Lipinski
 from rdkit.Chem import Crippen
+from rdkit.Chem import Descriptors
 from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem import rdPartialCharges
 
@@ -199,6 +200,70 @@ def atom_featurizer(atom: Chem.Atom) -> np.ndarray:
     return np.concatenate([globals()[atom_feature](atom) for atom_feature in atom_features], axis=0)
 
 
+
+def compute_topocell_context(smiles):
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return torch.zeros(24, dtype=torch.float32), torch.tensor([0.0], dtype=torch.float32)
+
+    atoms = list(mol.GetAtoms())
+
+    hetero_count = sum(1 for a in atoms if a.GetAtomicNum() not in [1, 6])
+    heavy_count = mol.GetNumHeavyAtoms()
+    halogen_count = sum(1 for a in atoms if a.GetSymbol() in ["F", "Cl", "Br", "I"])
+
+    aromatic_ring_count = rdMolDescriptors.CalcNumAromaticRings(mol)
+    aliphatic_ring_count = rdMolDescriptors.CalcNumAliphaticRings(mol)
+    ring_count = rdMolDescriptors.CalcNumRings(mol)
+
+    smarts = {
+        "cf3": "[CX4](F)(F)F",
+        "sulfonamide": "S(=O)(=O)N",
+        "amide": "C(=O)N",
+        "urea": "NC(=O)N",
+        "piperazine": "N1CCNCC1",
+        "morpholine": "O1CCNCC1",
+        "imidic": "N=C(O)",
+    }
+
+    flags = []
+    for patt in smarts.values():
+        q = Chem.MolFromSmarts(patt)
+        flags.append(float(mol.HasSubstructMatch(q)) if q is not None else 0.0)
+
+    feat = [
+        Descriptors.MolWt(mol) / 600.0,
+        Crippen.MolLogP(mol) / 10.0,
+        rdMolDescriptors.CalcTPSA(mol) / 200.0,
+        Lipinski.NumHAcceptors(mol) / 12.0,
+        Lipinski.NumHDonors(mol) / 8.0,
+        Lipinski.NumRotatableBonds(mol) / 20.0,
+        ring_count / 8.0,
+        aromatic_ring_count / 6.0,
+        aliphatic_ring_count / 6.0,
+        rdMolDescriptors.CalcFractionCSP3(mol),
+        heavy_count / 80.0,
+        hetero_count / max(heavy_count, 1),
+        halogen_count / 8.0,
+    ]
+
+    feat.extend(flags)
+
+    while len(feat) < 24:
+        feat.append(0.0)
+
+    hard_flag = float(
+        aromatic_ring_count >= 2
+        or ring_count >= 3
+        or hetero_count >= 4
+        or halogen_count >= 2
+        or any(flags)
+    )
+
+    return torch.tensor(feat[:24], dtype=torch.float32), torch.tensor([hard_flag], dtype=torch.float32)
+
+
+
 # =========================================================================
 # SMRT 数据集定义
 # =========================================================================
@@ -321,8 +386,19 @@ class SMRTComplexDataset(InMemoryComplexDataset):
 
             # --- C. 构建 Data 对象 ---
             y = torch.tensor([rt], dtype=torch.float)
-            data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, 
-                        y=y, num_nodes=len(x))
+
+            global_feat, hard_flag = compute_topocell_context(smiles)
+
+            data = Data(
+                x=x,
+                edge_index=edge_index,
+                edge_attr=edge_attr,
+                y=y,
+                num_nodes=len(x),
+                global_feat=global_feat.view(1, -1),
+                hard_flag=hard_flag.view(1),
+                smiles=smiles,
+            )
             data_list.append(data)
 
         print(f"Step 2/2: Lifting Graphs to Cell Complexes (finding rings <= {self._max_ring_size})...")
