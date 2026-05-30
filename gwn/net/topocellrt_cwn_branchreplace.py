@@ -123,15 +123,41 @@ class CWNEdgeBranch(nn.Module):
         out_xs = list(self.cwn_conv(*params))
 
         # node 由 AtomBondAttentionConv 更新，这里只取 edge/ring 分支
-        # plain branchreplace: 先验证 DualCellBondConv -> CINppConv 是否成立
+        # ring-aware branchreplace:
+        # 1) gated edge residual
+        # 2) gated ring residual
+        # 3) explicit ring-cell -> edge-cell feedback
         edge_delta = out_xs[1]
-        edge_out = edge_h + torch.tanh(self.edge_scale) * edge_delta
+        edge_gate = self.edge_gate(torch.cat([edge_h, edge_delta], dim=-1))
+        edge_out = edge_h + torch.tanh(self.edge_scale) * edge_gate * edge_delta
 
         if has_ring and len(out_xs) > 2:
             ring_delta = out_xs[2]
-            ring_out = ring_h + torch.tanh(self.ring_scale) * ring_delta
+            ring_gate = self.ring_gate(torch.cat([ring_h, ring_delta], dim=-1))
+            ring_out = ring_h + torch.tanh(self.ring_scale) * ring_gate * ring_delta
         else:
             ring_out = ring_h
+
+        if has_ring and ring_out is not None and ring_out.numel() > 0:
+            ring_cochain = data.cochains[2]
+            boundary = ring_cochain.boundary_index
+
+            if boundary is not None and boundary.numel() > 0:
+                edge_ids = boundary[0].long()
+                ring_ids = boundary[1].long()
+
+                ring_msg = scatter(
+                    ring_out[ring_ids],
+                    edge_ids,
+                    dim=0,
+                    dim_size=edge_out.size(0),
+                    reduce="mean",
+                )
+
+                ring_edge_delta = self.ring_to_edge(torch.cat([edge_out, ring_msg], dim=-1))
+                ring_edge_gate = self.ring_edge_gate(torch.cat([edge_out, ring_msg], dim=-1))
+
+                edge_out = edge_out + torch.tanh(self.ring_edge_scale) * ring_edge_gate * ring_edge_delta
 
         return edge_out, ring_out
 
@@ -183,9 +209,13 @@ class TopoCellRTCWNBranchBlock(nn.Module):
         h_gat = F.gelu(self.BatchNorm(h_gat))
 
         # 2. 只把 DualCellBondConv 换成 CWN edge/ring branch
+        # 用少量 h_gat 参与 CWN edge branch；初始化 mix≈0.018，几乎等价于原 h
+        mix = torch.sigmoid(self.node_mix_logit)
+        node_for_cwn = (1.0 - mix) * h + mix * h_gat
+
         edge_h2, ring_h2 = self.cwn_edge(
             data=data,
-            h=h,
+            h=node_for_cwn,
             edge_h=edge_h,
             ring_h=ring_h,
         )
