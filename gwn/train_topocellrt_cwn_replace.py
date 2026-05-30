@@ -305,7 +305,7 @@ def plot_final_result(targets, preds, save_path, history=None):
 # ================= 主程序 =================
 
 def main():
-    seed = 42
+    seed = int(os.getenv('SPLIT_SEED', '1'))
     torch.manual_seed(seed)
     np.random.seed(seed)
     
