@@ -172,7 +172,7 @@ def reorder_one(origin_csv, existing_taut_csv, output_csv, audit_csv=None, outpu
         raise SystemExit(1)
 
     # canonical identity check
-    same = merged["_origin_canon"].astype(str).values == merged["_orig_canon_taut"].astype(str).values
+    same = merged["_origin_canon"].astype(str).values == merged["_orig_canon"].astype(str).values
     print("canonical identity matched:", int(same.sum()), "/", len(same))
 
     if same.sum() != len(same):
@@ -184,7 +184,7 @@ def reorder_one(origin_csv, existing_taut_csv, output_csv, audit_csv=None, outpu
             "_taut_smile",
             "rt",
             "_origin_canon",
-            "_orig_canon_taut",
+            "_orig_canon",
         ]].to_string(index=False))
         raise SystemExit(1)
 
