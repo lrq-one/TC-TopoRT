@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 
@@ -6,13 +7,18 @@ from net.topocellrt_cwn_replace import TopoCellRTCWNReplace
 
 class TopoCellRTCWNDualView(nn.Module):
     """
-    End-to-end dual-view model for RT prediction.
+    Frozen-branch dual-view gate model.
 
     origin_data -> origin encoder -> origin_pred, origin_emb
     taut_data   -> taut encoder   -> taut_pred, taut_emb
 
-    A learned gate decides how much to trust origin/taut view.
-    A soft disagreement mask keeps stable molecules close to origin prediction.
+    alpha_origin close to 1 means trust origin.
+    alpha_origin close to 0 means trust taut.
+
+    Compared with V1:
+    1. Gate is initialized around post-hoc alpha=0.704.
+    2. Gate outputs residual logit around this prior, not random sigmoid collapse.
+    3. tau exists but should be fixed by training script.
     """
 
     def __init__(
@@ -54,22 +60,32 @@ class TopoCellRTCWNDualView(nn.Module):
 
         hdim = emb_dim * 2
 
-        # gate input:
-        # emb_o, emb_t, |emb_o - emb_t| = 3 * 512
-        # pred_o, pred_t, |pred_o - pred_t| = 3
-        self.gate_mlp = nn.Sequential(
-            nn.Linear(hdim * 3 + 3, hdim),
+        # emb_o, emb_t, |emb_o-emb_t| = 3 * 512
+        # pred_o, pred_t, |pred_o-pred_t| = 3
+        gate_in_dim = hdim * 3 + 3
+
+        self.gate_delta = nn.Sequential(
+            nn.Linear(gate_in_dim, hdim),
             nn.LayerNorm(hdim),
             nn.GELU(),
             nn.Dropout(0.10),
             nn.Linear(hdim, hdim // 2),
             nn.GELU(),
             nn.Linear(hdim // 2, 1),
-            nn.Sigmoid(),
         )
 
-        # learnable threshold. Initialized from current best post-hoc tau=5.
-        self.tau = nn.Parameter(torch.tensor(float(init_tau)))
+        # Start from current best post-hoc alpha=0.704.
+        prior = min(max(float(gate_prior_alpha), 1e-4), 1.0 - 1e-4)
+        logit_prior = math.log(prior / (1.0 - prior))
+        self.register_buffer("gate_logit_prior", torch.tensor(float(logit_prior)))
+
+        # Keep initial delta small, but allow sample-specific learning.
+        last_linear = self.gate_delta[-1]
+        nn.init.normal_(last_linear.weight, mean=0.0, std=1e-3)
+        nn.init.zeros_(last_linear.bias)
+
+        # Tau should be fixed by the training script in V2/V3.
+        self.tau = nn.Parameter(torch.tensor(float(init_tau)), requires_grad=False)
 
     def forward(self, origin_data, taut_data, return_aux=False):
         pred_o, aux_o = self.origin_encoder(origin_data, include_partial=True)
@@ -94,13 +110,12 @@ class TopoCellRTCWNDualView(nn.Module):
             dim=-1,
         )
 
-        # alpha close to 1 means trust origin more.
-        alpha_origin = self.gate_mlp(gate_input).view(-1)
+        delta_logit = self.gate_delta(gate_input).view(-1)
+        alpha_origin = torch.sigmoid(self.gate_logit_prior + delta_logit)
 
         mixed_pred = alpha_origin * pred_o + (1.0 - alpha_origin) * pred_t
 
-        # Stable molecules keep origin prediction.
-        # Disagreement molecules allow learned fusion.
+        # Conservative disagreement mask.
         soft_use = torch.sigmoid(
             (torch.abs(pred_o - pred_t) - self.tau) / self.temperature
         )

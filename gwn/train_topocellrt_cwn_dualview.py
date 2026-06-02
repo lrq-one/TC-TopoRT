@@ -65,7 +65,13 @@ class Config:
 
     FREEZE_EPOCHS = int(os.getenv("FREEZE_EPOCHS", "10"))
     AUX_LOSS_W = float(os.getenv("AUX_LOSS_W", "0.2"))
-    GATE_PRIOR_W = float(os.getenv("GATE_PRIOR_W", "0.01"))
+    GATE_PRIOR_W = float(os.getenv("GATE_PRIOR_W", "0.05"))
+    PREF_LOSS_W = float(os.getenv("PREF_LOSS_W", "0.5"))
+    PREF_TEMP = float(os.getenv("PREF_TEMP", "20.0"))
+
+    # V3 default: do not update origin/taut branches, only train gate.
+    TRAIN_BRANCHES = int(os.getenv("TRAIN_BRANCHES", "0")) == 1
+    TRAIN_TAU = int(os.getenv("TRAIN_TAU", "0")) == 1
 
     CWN_LAYERS = int(os.getenv("CWN_LAYERS", "6"))
     CWN_HIDDEN = int(os.getenv("CWN_HIDDEN", "256"))
@@ -212,12 +218,21 @@ def set_requires_grad(module, flag):
 def freeze_all_branches(model):
     set_requires_grad(model.origin_encoder, False)
     set_requires_grad(model.taut_encoder, False)
-    set_requires_grad(model.gate_mlp, True)
-    model.tau.requires_grad = True
+
+    if hasattr(model, "gate_mlp"):
+        set_requires_grad(model.gate_mlp, True)
+    if hasattr(model, "gate_delta"):
+        set_requires_grad(model.gate_delta, True)
+
+    model.tau.requires_grad = bool(Config.TRAIN_TAU)
 
 
 def unfreeze_head_branches(model):
-    # 保留 cwn_adapter 冻结，只微调后半段 head/gate，省显存并减少过拟合。
+    if not Config.TRAIN_BRANCHES:
+        freeze_all_branches(model)
+        return
+
+    # Optional experimental mode. Default should NOT use this.
     set_requires_grad(model.origin_encoder, False)
     set_requires_grad(model.taut_encoder, False)
 
@@ -234,12 +249,44 @@ def unfreeze_head_branches(model):
             if hasattr(enc, name):
                 set_requires_grad(getattr(enc, name), True)
 
-    set_requires_grad(model.gate_mlp, True)
-    model.tau.requires_grad = True
+    if hasattr(model, "gate_mlp"):
+        set_requires_grad(model.gate_mlp, True)
+    if hasattr(model, "gate_delta"):
+        set_requires_grad(model.gate_delta, True)
+
+    model.tau.requires_grad = bool(Config.TRAIN_TAU)
 
 
 def count_trainable_params(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def enforce_train_eval_mode(model, epoch):
+    """
+    Critical fix:
+    requires_grad=False does not freeze BatchNorm running_mean/running_var.
+    Since origin/taut branches are pretrained, keep them eval by default.
+    """
+    model.train()
+
+    if not Config.TRAIN_BRANCHES:
+        model.origin_encoder.eval()
+        model.taut_encoder.eval()
+        if hasattr(model, "gate_mlp"):
+            model.gate_mlp.train()
+        if hasattr(model, "gate_delta"):
+            model.gate_delta.train()
+        return
+
+    if hasattr(model.origin_encoder, "cwn_adapter"):
+        model.origin_encoder.cwn_adapter.eval()
+    if hasattr(model.taut_encoder, "cwn_adapter"):
+        model.taut_encoder.cwn_adapter.eval()
+
+    if hasattr(model, "gate_mlp"):
+        model.gate_mlp.train()
+    if hasattr(model, "gate_delta"):
+        model.gate_delta.train()
 
 
 def load_branch_ckpt(model):
@@ -265,29 +312,28 @@ def load_branch_ckpt(model):
 
 
 def make_optimizer(model, epoch):
-    if epoch <= Config.FREEZE_EPOCHS:
+    if (not Config.TRAIN_BRANCHES) or epoch <= Config.FREEZE_EPOCHS:
         freeze_all_branches(model)
-        params = [
-            {"params": model.gate_mlp.parameters(), "lr": Config.HEAD_LR},
-            {"params": [model.tau], "lr": Config.HEAD_LR},
-        ]
     else:
         unfreeze_head_branches(model)
-        branch_params = []
-        head_params = []
 
-        for name, p in model.named_parameters():
-            if not p.requires_grad:
-                continue
-            if name.startswith("gate_mlp") or name == "tau":
-                head_params.append(p)
-            else:
-                branch_params.append(p)
+    gate_params = []
+    branch_params = []
 
-        params = [
-            {"params": branch_params, "lr": Config.BRANCH_LR},
-            {"params": head_params, "lr": Config.HEAD_LR},
-        ]
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
+
+        if name.startswith("gate_mlp") or name.startswith("gate_delta") or name == "tau":
+            gate_params.append(param)
+        else:
+            branch_params.append(param)
+
+    params = []
+    if branch_params:
+        params.append({"params": branch_params, "lr": Config.BRANCH_LR})
+    if gate_params:
+        params.append({"params": gate_params, "lr": Config.HEAD_LR})
 
     optimizer = torch.optim.AdamW(
         params,
@@ -299,15 +345,37 @@ def make_optimizer(model, epoch):
 
 def compute_loss(final_pred, aux, target, model):
     main_loss = F.smooth_l1_loss(final_pred.view(-1), target, beta=Config.HUBER_BETA)
-    origin_loss = F.smooth_l1_loss(aux["origin_pred"].view(-1), target, beta=Config.HUBER_BETA)
-    taut_loss = F.smooth_l1_loss(aux["taut_pred"].view(-1), target, beta=Config.HUBER_BETA)
+
+    # Branch losses are only useful if branches are trainable.
+    if Config.TRAIN_BRANCHES:
+        origin_loss = F.smooth_l1_loss(aux["origin_pred"].view(-1), target, beta=Config.HUBER_BETA)
+        taut_loss = F.smooth_l1_loss(aux["taut_pred"].view(-1), target, beta=Config.HUBER_BETA)
+    else:
+        origin_loss = torch.zeros_like(main_loss)
+        taut_loss = torch.zeros_like(main_loss)
+
     gate_prior = model.gate_prior_loss(aux)
+
+    # Preference target:
+    # alpha_origin should be high if origin error < taut error.
+    with torch.no_grad():
+        err_o = torch.abs(aux["origin_pred"].view(-1) - target)
+        err_t = torch.abs(aux["taut_pred"].view(-1) - target)
+
+        # Soft target is more stable than hard 0/1.
+        # If taut is much worse than origin, target -> 1.
+        # If origin is much worse than taut, target -> 0.
+        pref_target = torch.sigmoid((err_t - err_o) / Config.PREF_TEMP)
+
+    alpha = aux["alpha_origin"].view(-1).clamp(1e-4, 1.0 - 1e-4)
+    pref_loss = F.binary_cross_entropy(alpha, pref_target)
 
     loss = (
         main_loss
         + Config.AUX_LOSS_W * origin_loss
         + Config.AUX_LOSS_W * taut_loss
         + Config.GATE_PRIOR_W * gate_prior
+        + Config.PREF_LOSS_W * pref_loss
     )
 
     return loss, {
@@ -315,11 +383,12 @@ def compute_loss(final_pred, aux, target, model):
         "origin_loss": float(origin_loss.detach().cpu()),
         "taut_loss": float(taut_loss.detach().cpu()),
         "gate_prior": float(gate_prior.detach().cpu()),
+        "pref_loss": float(pref_loss.detach().cpu()),
     }
 
 
 def train_one_epoch(model, loader, optimizer, epoch):
-    model.train()
+    enforce_train_eval_mode(model, epoch)
     total_loss = 0.0
     total_mae = 0.0
     steps = 0
@@ -607,7 +676,7 @@ def main():
     print("\n=== Training ===")
 
     for epoch in range(1, Config.EPOCHS + 1):
-        stage = "gate_only" if epoch <= Config.FREEZE_EPOCHS else "head_finetune"
+        stage = "gate_only" if ((not Config.TRAIN_BRANCHES) or epoch <= Config.FREEZE_EPOCHS) else "head_finetune"
 
         if stage != current_stage:
             optimizer = make_optimizer(model, epoch)
