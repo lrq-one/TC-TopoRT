@@ -50,10 +50,19 @@ def metrics(y, p, prefix=""):
     p = np.asarray(p, dtype=np.float64)
     e = np.abs(y - p)
 
+    ss_res = float(np.sum((y - p) ** 2))
+    ss_tot = float(np.sum((y - np.mean(y)) ** 2))
+    r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else float("nan")
+
+    rel = e / (np.abs(y) + 1e-8) * 100.0
+
     out = {
         "mae": float(e.mean()),
         "medae": float(np.median(e)),
         "rmse": float(np.sqrt(np.mean((y - p) ** 2))),
+        "mre": float(np.mean(rel)),
+        "medre": float(np.median(rel)),
+        "r2": float(r2),
         "p95": float(np.percentile(e, 95)),
         "p99": float(np.percentile(e, 99)),
         "gt80": int((e > 80).sum()),
