@@ -1,4 +1,5 @@
 import os
+import argparse
 import pandas as pd
 from rdkit import Chem, RDLogger
 from rdkit.Chem import rdMolDescriptors
@@ -179,17 +180,40 @@ def build_one(input_csv, output_csv, audit_csv):
             print("---")
 
 
+
 def main():
+    ap = argparse.ArgumentParser(
+        description="Build strict tautomer canonical SMRT CSVs without changing RT labels or train/test split."
+    )
+    ap.add_argument(
+        "--train_csv",
+        default="gwn/data/SMRT_train.csv",
+        help="Input official SMRT train CSV. Must contain column 'smile'.",
+    )
+    ap.add_argument(
+        "--test_csv",
+        default="gwn/data/SMRT_test.csv",
+        help="Input official SMRT test CSV. Must contain column 'smile'.",
+    )
+    ap.add_argument(
+        "--out_dir",
+        default="gwn/data_taut_strict_generated",
+        help="Output directory for generated strict tautomer CSVs. Default avoids overwriting final paper data.",
+    )
+    args = ap.parse_args()
+
+    os.makedirs(args.out_dir, exist_ok=True)
+
     build_one(
-        "./SMRT_data/data/SMRT_train.csv",
-        "./SMRT_data/data/SMRT_train_tautomer_strict.csv",
-        "./SMRT_data/data/SMRT_train_tautomer_strict_audit.csv",
+        args.train_csv,
+        os.path.join(args.out_dir, "SMRT_train_tautomer_strict.csv"),
+        os.path.join(args.out_dir, "SMRT_train_tautomer_strict_audit.csv"),
     )
 
     build_one(
-        "./SMRT_data/data/SMRT_test.csv",
-        "./SMRT_data/data/SMRT_test_tautomer_strict.csv",
-        "./SMRT_data/data/SMRT_test_tautomer_strict_audit.csv",
+        args.test_csv,
+        os.path.join(args.out_dir, "SMRT_test_tautomer_strict.csv"),
+        os.path.join(args.out_dir, "SMRT_test_tautomer_strict_audit.csv"),
     )
 
 

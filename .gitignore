@@ -6,3 +6,31 @@
 *.pt
 *.pkl
 __pycache__/
+# local archives / legacy backups
+_archive_legacy/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# logs
+*.log
+logs/
+gwn/logs/
+
+# model checkpoints and large binaries
+*.pth
+*.pt
+*.ckpt
+model_dict/
+
+# generated result folders / caches
+gwn/results_OOF_DualView_Stack_*/
+gwn/smrt_cwn_oof_*/
+gwn/smrt_cwn_data_*/
+gwn/smrt_topocellrt_*/
+gwn/paper_final_results_TCDV_TopoRT_*.tar.gz
+
+# generated tautomer outputs
+gwn/data_taut_strict_generated/
