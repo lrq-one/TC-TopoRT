@@ -34,3 +34,6 @@ gwn/paper_final_results_TCDV_TopoRT_*.tar.gz
 
 # generated tautomer outputs
 gwn/data_taut_strict_generated/
+
+# Local external datasets for transfer/filtering experiments
+gwn/external_data/
