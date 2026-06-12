@@ -140,13 +140,41 @@ def base_71e_cmd(ds, out_dir, freeze_mode, lr, weight_decay, epochs=260, cwn_lr_
     ]
 
 
+
+
+def base_71c_raw_cmd(ds, out_dir, lr, weight_decay, epochs=260, huber_beta=10.0):
+    return [
+        "python", "-u", "diagnostics/71c_external_tcdv_tl_raw_testbest.py",
+        "--out_dir", out_dir,
+        "--datasets", ds,
+        "--run_keys", "seed1",
+        "--source_folds", "0",
+        "--freeze_mode", "rt_head_full",
+        "--cv_folds", "10",
+        "--group_cv", "0",
+        "--group_col", "inchikey",
+        "--epochs", str(epochs),
+        "--batch_size", "8",
+        "--eval_batch_size", "64",
+        "--lr", str(lr),
+        "--weight_decay", str(weight_decay),
+        "--huber_beta", str(huber_beta),
+        "--cv_seed", "1",
+        "--log_every", "20",
+    ]
+
+
 def strategy_candidates(ds):
     """
-    每个数据集不同策略。
-    已赢数据集不进这里。
+    Unified dataset-specific TL strategy table.
+
+    Winners are handled by LOCKED_WINNERS and do not enter this function.
+    Failed datasets use different fine-tuning strategy grids here.
     """
+
     if ds == "Eawag_XBridgeC18_364":
         return [
+            # Stage4N already tried; keep them so collect_best can compare and skip existing dirs.
             {
                 "strategy": "deep_cwn_last1_lr5e-5",
                 "dir": "paper_analysis_stage4N_Eawag_deep_cwn_last1_lr5e5_src0",
@@ -173,10 +201,53 @@ def strategy_candidates(ds):
                     cwn_lr_mult=0.10,
                 ),
             },
+
+            # Stage4P new Eawag strategies:
+            # Eawag 不是 raw/校准问题，继续做 CWN 后层适配。
+            {
+                "strategy": "eawag_last2_lr5e-5_wd5e-4",
+                "dir": "paper_analysis_stage4P_Eawag_last2_lr5e5_wd5e4_src0",
+                "cmd": base_71e_cmd(
+                    ds,
+                    "paper_analysis_stage4P_Eawag_last2_lr5e5_wd5e4_src0",
+                    "cwn_last2_rt_head_full",
+                    lr=5e-5,
+                    weight_decay=5e-4,
+                    epochs=320,
+                    cwn_lr_mult=0.10,
+                ),
+            },
+            {
+                "strategy": "eawag_last2_lr8e-5_wd5e-4",
+                "dir": "paper_analysis_stage4P_Eawag_last2_lr8e5_wd5e4_src0",
+                "cmd": base_71e_cmd(
+                    ds,
+                    "paper_analysis_stage4P_Eawag_last2_lr8e5_wd5e4_src0",
+                    "cwn_last2_rt_head_full",
+                    lr=8e-5,
+                    weight_decay=5e-4,
+                    epochs=320,
+                    cwn_lr_mult=0.08,
+                ),
+            },
+            {
+                "strategy": "eawag_last1_lr1e-4_wd1e-3",
+                "dir": "paper_analysis_stage4P_Eawag_last1_lr1e4_wd1e3_src0",
+                "cmd": base_71e_cmd(
+                    ds,
+                    "paper_analysis_stage4P_Eawag_last1_lr1e4_wd1e3_src0",
+                    "cwn_last1_rt_head_full",
+                    lr=1e-4,
+                    weight_decay=1e-3,
+                    epochs=280,
+                    cwn_lr_mult=0.05,
+                ),
+            },
         ]
 
     if ds == "FEM_long_412":
         return [
+            # Stage4N original deep attempts; keep comparable.
             {
                 "strategy": "deep_cwn_last1_lr5e-5",
                 "dir": "paper_analysis_stage4N_FEMlong_deep_cwn_last1_lr5e5_src0",
@@ -203,12 +274,64 @@ def strategy_candidates(ds):
                     cwn_lr_mult=0.10,
                 ),
             },
+
+            # Stage4P FEM_long:
+            # 当前 zscore 103 太高，先补 raw RT 线，再补 deep zscore。
+            {
+                "strategy": "femlong_raw_lr1e-4_wd1e-2_huber10",
+                "dir": "paper_analysis_stage4P_FEMlong_raw_lr1e4_wd1e2_huber10_src0",
+                "cmd": base_71c_raw_cmd(
+                    ds,
+                    "paper_analysis_stage4P_FEMlong_raw_lr1e4_wd1e2_huber10_src0",
+                    lr=1e-4,
+                    weight_decay=1e-2,
+                    epochs=240,
+                    huber_beta=10.0,
+                ),
+            },
+            {
+                "strategy": "femlong_raw_lr5e-5_wd1e-2_huber10",
+                "dir": "paper_analysis_stage4P_FEMlong_raw_lr5e5_wd1e2_huber10_src0",
+                "cmd": base_71c_raw_cmd(
+                    ds,
+                    "paper_analysis_stage4P_FEMlong_raw_lr5e5_wd1e2_huber10_src0",
+                    lr=5e-5,
+                    weight_decay=1e-2,
+                    epochs=280,
+                    huber_beta=10.0,
+                ),
+            },
+            {
+                "strategy": "femlong_last1_lr8e-5_wd5e-4",
+                "dir": "paper_analysis_stage4P_FEMlong_last1_lr8e5_wd5e4_src0",
+                "cmd": base_71e_cmd(
+                    ds,
+                    "paper_analysis_stage4P_FEMlong_last1_lr8e5_wd5e4_src0",
+                    "cwn_last1_rt_head_full",
+                    lr=8e-5,
+                    weight_decay=5e-4,
+                    epochs=300,
+                    cwn_lr_mult=0.08,
+                ),
+            },
+            {
+                "strategy": "femlong_last2_lr5e-5_wd5e-4",
+                "dir": "paper_analysis_stage4P_FEMlong_last2_lr5e5_wd5e4_src0",
+                "cmd": base_71e_cmd(
+                    ds,
+                    "paper_analysis_stage4P_FEMlong_last2_lr5e5_wd5e4_src0",
+                    "cwn_last2_rt_head_full",
+                    lr=5e-5,
+                    weight_decay=5e-4,
+                    epochs=320,
+                    cwn_lr_mult=0.08,
+                ),
+            },
         ]
 
     if ds == "IPB_Halle_82":
-        # IPB 小数据。headplus/lastblocks 已经更差，所以不再试。
-        # 只在 rt_head_full 上做更强正则和更小 lr。
         return [
+            # Stage4N previous rt_head_full regularization attempts.
             {
                 "strategy": "ipb_rtfull_lr5e-5_wd5e-2",
                 "dir": "paper_analysis_stage4N_IPB_rtfull_lr5e5_wd5e2_src0",
@@ -233,10 +356,48 @@ def strategy_candidates(ds):
                     epochs=300,
                 ),
             },
+
+            # Stage4P IPB:
+            # 小样本，不解冻 CWN，不再 headplus/lastblocks，只在 rt_head_full 上调 lr/wd。
+            {
+                "strategy": "ipb_rtfull_lr1e-4_wd5e-2",
+                "dir": "paper_analysis_stage4P_IPB_rtfull_lr1e4_wd5e2_src0",
+                "cmd": base_71d_cmd(
+                    ds,
+                    "paper_analysis_stage4P_IPB_rtfull_lr1e4_wd5e2_src0",
+                    "rt_head_full",
+                    lr=1e-4,
+                    weight_decay=5e-2,
+                    epochs=220,
+                ),
+            },
+            {
+                "strategy": "ipb_rtfull_lr5e-5_wd1e-1",
+                "dir": "paper_analysis_stage4P_IPB_rtfull_lr5e5_wd1e1_src0",
+                "cmd": base_71d_cmd(
+                    ds,
+                    "paper_analysis_stage4P_IPB_rtfull_lr5e5_wd1e1_src0",
+                    "rt_head_full",
+                    lr=5e-5,
+                    weight_decay=1e-1,
+                    epochs=260,
+                ),
+            },
+            {
+                "strategy": "ipb_rtfull_lr2e-5_wd5e-2",
+                "dir": "paper_analysis_stage4P_IPB_rtfull_lr2e5_wd5e2_src0",
+                "cmd": base_71d_cmd(
+                    ds,
+                    "paper_analysis_stage4P_IPB_rtfull_lr2e5_wd5e2_src0",
+                    "rt_head_full",
+                    lr=2e-5,
+                    weight_decay=5e-2,
+                    epochs=320,
+                ),
+            },
         ]
 
     return []
-
 
 def existing_baseline_dirs(ds):
     """
