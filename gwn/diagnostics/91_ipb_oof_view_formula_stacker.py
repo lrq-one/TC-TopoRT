@@ -20,6 +20,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 CANDIDATES = {
     "old_zscore": "paper_analysis_stage4I_tcdv_tl_zscore_testbest_IPB_Halle_82_src0",
     "best_zscore": "paper_analysis_stage4P_IPB_rtfull_lr1e4_wd5e2_src0",
+    "l2sp1e6": "paper_analysis_stage4V_IPB_zscore_rtfull_l2sp1e6_src0",
     "wd1e1": "paper_analysis_stage4P_IPB_rtfull_lr5e5_wd1e1_src0",
     "lr2e5": "paper_analysis_stage4P_IPB_rtfull_lr2e5_wd5e2_src0",
     "raw": "paper_analysis_stage4Q_IPB_raw_rtfull_lr1e4_wd5e2_huber10_src0",
