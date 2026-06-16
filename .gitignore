@@ -37,3 +37,34 @@ gwn/data_taut_strict_generated/
 
 # Local external datasets for transfer/filtering experiments
 gwn/external_data/
+
+# ===== TCDV-TopoRT local experiment artifacts =====
+/ablations/
+/gwn/results_*/
+/gwn/final_*/
+/gwn/paper_analysis*/
+/gwn/*_work*/
+/gwn/h2_work*/
+/gwn/dualview_work*/
+/gwn/smrt_*_train/
+/gwn/smrt_*_test/
+/gwn/experiments_transfer_effectiveness/results_*/
+/gwn/experiments_transfer_effectiveness/logs/
+/gwn/experiments_transfer_effectiveness/fixed_raw_autoselect_table2/results_*/
+/gwn/experiments_transfer_effectiveness/fixed_raw_autoselect_table2/*.csv
+
+# model/checkpoint/cache
+*.pth
+*.pt
+*.ckpt
+*.npy
+*.npz
+*.pkl
+*.joblib
+*.log
+__pycache__/
+*.pyc
+
+# local analysis outputs
+*.tmp
+*.bak
