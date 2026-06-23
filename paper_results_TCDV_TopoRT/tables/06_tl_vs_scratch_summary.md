@@ -1,0 +1,12 @@
+| dataset_name | n | mae_Scratch_random_init | mae_TL_pretrained | MAE_improvement_s | TL_better_MAE | medae_Scratch_random_init | medae_TL_pretrained | MedAE_improvement_s | TL_better_MedAE | r2_Scratch_random_init | r2_TL_pretrained | R2_improvement_abs | TL_better_R2 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| FEM_short_73 | 73 | 99.4390 | 67.4993 | 31.9397 | True | 66.1650 | 32.5308 | 33.6342 | True | 0.8897 | 0.9312 | 0.0415 | True |
+| UniToyama_Atlantis_143 | 143 | 72.1139 | 57.3954 | 14.7185 | True | 40.0465 | 31.7472 | 8.2993 | True | 0.8514 | 0.8806 | 0.0292 | True |
+| FEM_long_412 | 412 | 117.1540 | 106.3957 | 10.7583 | True | 59.0609 | 56.2651 | 2.7958 | True | 0.9473 | 0.9567 | 0.0094 | True |
+| Eawag_XBridgeC18_364 | 364 | 58.5117 | 54.7887 | 3.7230 | True | 37.5807 | 41.7633 | -4.1826 | False | 0.8715 | 0.8960 | 0.0245 | True |
+| LIFE_old_194 | 194 | 11.6040 | 9.4903 | 2.1137 | True | 7.2917 | 5.2414 | 2.0502 | True | 0.9248 | 0.9475 | 0.0227 | True |
+| MTBLS87_147 | 147 | 69.4439 | 69.0099 | 0.4339 | True | 43.6561 | 40.0491 | 3.6070 | True | 0.8341 | 0.7892 | -0.0450 | False |
+| LIFE_new_184 | 184 | 14.7011 | 15.5891 | -0.8880 | False | 7.9533 | 7.8668 | 0.0865 | True | 0.9164 | 0.9077 | -0.0087 | False |
+| Cao_HILIC_116 | 116 | 67.7614 | 71.5916 | -3.8302 | False | 37.2531 | 40.0350 | -2.7819 | False | 0.7595 | 0.7504 | -0.0091 | False |
+| IPB_Halle_82 | 82 | 13.0508 | 16.9672 | -3.9164 | False | 7.6617 | 9.2538 | -1.5920 | False | 0.9784 | 0.9728 | -0.0056 | False |
+| FEM_lipids_72 | 72 | 55.7618 | 62.0255 | -6.2637 | False | 18.9920 | 26.3645 | -7.3725 | False | 0.9025 | 0.8834 | -0.0190 | False |
