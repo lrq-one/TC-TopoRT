@@ -113,7 +113,7 @@ w/o explicit ring 2-cells:
 
 Note:
 
-The No2Cell result exists and its config is saved, but the standalone run shell script was not present before cleanup. A helper script should be added later:
+The No2Cell result exists and its config is saved. The reproduction helper script has now been added:
 
 - ablations/gwn_cwn_structural_ablation/run_ablation_no2cell_seed5.sh
 
