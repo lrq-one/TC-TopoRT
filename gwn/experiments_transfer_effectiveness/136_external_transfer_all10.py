@@ -1,6 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+Run TCDV-TopoRT external transfer learning on the all10 external datasets.
+
+This is the paper-facing transfer-learning wrapper.
+
+It calls:
+  experiments_transfer_effectiveness/run_external_table2_fixed_raw_autoselect.py
+
+Protocol:
+  - init_mode = tl
+  - freeze_mode = rt_head_full
+  - reset_out_lin = 1
+  - source_folds = 0 1 2 3 4
+  - cv_folds = 10
+  - fixed raw AutoSelect aggregation through 122c
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -9,15 +26,21 @@ import sys
 from pathlib import Path
 
 
-MISSING4_DATASETS = [
+ALL10_DATASETS = [
     "FEM_short_73",
     "UniToyama_Atlantis_143",
+    "FEM_long_412",
+    "Eawag_XBridgeC18_364",
+    "LIFE_old_194",
     "MTBLS87_147",
+    "LIFE_new_184",
     "Cao_HILIC_116",
+    "IPB_Halle_82",
+    "FEM_lipids_72",
 ]
 
 
-def run_cmd(cmd, dry_run=False):
+def run_cmd(cmd, dry_run: bool = False):
     print("\n" + "=" * 100)
     print("RUN:")
     print(" ".join(map(str, cmd)))
@@ -34,13 +57,11 @@ def main():
 
     ap.add_argument(
         "--out_root",
-        default="experiments_transfer_effectiveness/fixed_raw_autoselect_missing4_cvseed1",
+        default="experiments_transfer_effectiveness/fixed_raw_autoselect_all10_cvseed1",
     )
-    ap.add_argument("--datasets", nargs="+", default=MISSING4_DATASETS)
+    ap.add_argument("--datasets", nargs="+", default=ALL10_DATASETS)
 
-    # 为了和当前主文 6 个新 TL 结果保持一致，默认只跑 cv_seed=1
     ap.add_argument("--cv_seeds", nargs="+", type=int, default=[1])
-
     ap.add_argument("--run_keys", nargs="+", default=["seed5"])
     ap.add_argument("--source_folds", nargs="+", type=int, default=[0, 1, 2, 3, 4])
 
@@ -77,9 +98,8 @@ def main():
 
     run_cmd(cmd, dry_run=bool(args.dry_run))
 
-    print("\n✅ transfer-only missing4 wrapper done:", args.out_root)
+    print("\n✅ transfer all10 wrapper done:", args.out_root)
 
 
 if __name__ == "__main__":
     main()
-    

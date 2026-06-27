@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+Run TCDV-TopoRT from-scratch training on the all10 external datasets.
+
+This is the paper-facing scratch-training wrapper.
+
+It calls:
+  experiments_transfer_effectiveness/119_external_tcdv_scratch_vs_tl.py
+
+Protocol:
+  - init_mode = scratch
+  - freeze_mode = all
+  - reset_out_lin = 0
+  - source_fold = 0 only as a placeholder, to avoid repeated equivalent scratch runs
+  - cv_folds = 10
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -24,7 +40,7 @@ ALL10_DATASETS = [
 ]
 
 
-def run_cmd(cmd, dry_run=False):
+def run_cmd(cmd, dry_run: bool = False):
     print("\n" + "=" * 100)
     print("RUN:")
     print(" ".join(map(str, cmd)))
@@ -59,11 +75,10 @@ def main():
 
     ap.add_argument(
         "--out_dir",
-        default="experiments_transfer_effectiveness/results_external_scratch_only_seed5_cvseed1",
+        default="experiments_transfer_effectiveness/results_external_scratch_all10_seed5_cvseed1",
     )
     ap.add_argument("--datasets", nargs="+", default=ALL10_DATASETS)
 
-    # scratch 只保留一个 source_fold 占位，不跑 5 个 source fold 重复实验
     ap.add_argument("--run_key", default="seed5")
     ap.add_argument("--source_fold", type=int, default=0)
 
@@ -107,7 +122,7 @@ def main():
     if not args.dry_run:
         copy_as_scratch_names(out_dir)
 
-    print("\n✅ scratch-only wrapper done:", out_dir)
+    print("\n✅ scratch all10 wrapper done:", out_dir)
 
 
 if __name__ == "__main__":

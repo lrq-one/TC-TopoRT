@@ -235,3 +235,18 @@ Do not remove:
 - gwn/final_external_results
 
 Future renaming should be done only after this map is complete.
+
+## External all10 transfer vs scratch entry points
+
+The cleaned external experiment wrappers are:
+
+- `gwn/experiments_transfer_effectiveness/136_external_transfer_all10.py`
+- `gwn/experiments_transfer_effectiveness/137_external_scratch_all10.py`
+- `gwn/experiments_transfer_effectiveness/run_transfer_all10_datasets.sh`
+- `gwn/experiments_transfer_effectiveness/run_scratch_all10_datasets.sh`
+
+Dataset list:
+
+- `gwn/configs/external_all10_datasets.csv`
+
+The all10 list combines the previous six Table-2 external datasets with the four additional external datasets used for transfer-vs-scratch comparison.
