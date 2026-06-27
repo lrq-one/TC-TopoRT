@@ -117,3 +117,30 @@ Next phase should focus on:
 2. adding missing reproduction helper scripts;
 3. renaming numeric diagnostic scripts into meaningful names;
 4. reorganizing code without changing model logic.
+
+## Root-level helper script cleanup
+
+Archived obsolete root-level helper scripts and cleanup records.
+
+Backup:
+
+- ../TCDV-TopoRT_cleanup_backups/round18_root_obsolete_scripts_20260627
+
+Archived categories:
+
+- old ABCORT-style figure attempts
+- old clean/overlay/radar figure variants
+- old candidate filtering audit helper
+- temporary cleanup CSV/TXT records
+
+Retained root-level scripts:
+
+- build_tautomer_strict_csv.py
+- make_jcim_style_figures.py
+- make_ablation_delta_figure_final.py
+- make_final_ablation_radar_like_abcort.py
+- make_final_candidate_filtering_summary_correct.py
+- make_final_formula_candidate_bar_like_abcort.py
+- make_formula_level_guarded_soft_final_plot.py
+- make_formula_level_bar_brostyle.py
+- make_formula_level_bar_pretty.py
