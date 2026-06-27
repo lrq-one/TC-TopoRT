@@ -1,0 +1,12 @@
+| dataset_name | n | scratch_mae | transfer_mae | mae_improvement | transfer_better |
+| --- | --- | --- | --- | --- | --- |
+| FEM_short_73 | 73 | 99.439 | 67.499 | 31.940 | True |
+| UniToyama_Atlantis_143 | 143 | 72.114 | 57.395 | 14.719 | True |
+| FEM_long_412 | 412 | 117.154 | 88.493 | 28.661 | True |
+| Eawag_XBridgeC18_364 | 364 | 58.512 | 47.218 | 11.294 | True |
+| LIFE_old_194 | 194 | 11.604 | 8.105 | 3.499 | True |
+| MTBLS87_147 | 147 | 69.444 | 69.010 | 0.434 | True |
+| LIFE_new_184 | 184 | 14.701 | 13.341 | 1.360 | True |
+| Cao_HILIC_116 | 116 | 67.761 | 71.592 | -3.831 | False |
+| IPB_Halle_82 | 82 | 13.051 | 13.340 | -0.289 | False |
+| FEM_lipids_72 | 72 | 55.761 | 51.907 | 3.854 | True |
