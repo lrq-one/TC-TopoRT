@@ -195,8 +195,8 @@ Evaluate RT-aware reranking/filtering on MetaboBase and RIKEN_PlaSMA candidate s
 Code and analysis locations:
 
 - gwn/experiments_candidate_filtering
-- gwn/diagnostics/63_candidate_filtering_smrt_formula_pool.py
-- gwn/diagnostics/86_eval_tl_rank_guard_and_soft_rerank.py
+- gwn/diagnostics/63_candidate_filtering_smrt_formula_pool.py  # archived in ../TCDV-TopoRT_cleanup_backups/round14_gwn_obsolete_diagnostics_code_20260627
+- gwn/diagnostics/86_eval_tl_rank_guard_and_soft_rerank.py  # archived in ../TCDV-TopoRT_cleanup_backups/round14_gwn_obsolete_diagnostics_code_20260627
 - gwn/diagnostics/97_eval_evaluable45_rank_guard_soft.py
 - gwn/diagnostics/99_make_final_experiment_A_table.py
 - gwn/diagnostics/108_make_final_riken_experiment_tables.py

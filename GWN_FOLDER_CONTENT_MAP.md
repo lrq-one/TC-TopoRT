@@ -301,3 +301,22 @@ gwn size depth 1:
 8.0K	gwn/scripts
 8.0K	gwn/configs
 ```
+
+## 11. Diagnostics code cleanup
+
+After the main output cleanup, gwn/diagnostics was reduced from 100 Python scripts to a compact final keep set.
+
+Archived backup:
+
+- ../TCDV-TopoRT_cleanup_backups/round14_gwn_obsolete_diagnostics_code_20260627
+
+Archived categories:
+
+- old external transfer tuning scripts
+- old posthoc calibration scripts
+- old S10 / sample45 / exact39 / full45 candidate filtering scripts
+- old IPB/Eawag error diagnosis scripts
+- old temporary generator scripts
+- old non-final OOF/fusion probing scripts
+
+The retained diagnostics scripts are the final SMRT, external transfer, candidate filtering, figure, and no-leak audit scripts.
