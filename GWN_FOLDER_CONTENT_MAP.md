@@ -320,3 +320,21 @@ Archived categories:
 - old non-final OOF/fusion probing scripts
 
 The retained diagnostics scripts are the final SMRT, external transfer, candidate filtering, figure, and no-leak audit scripts.
+
+## 12. Small obsolete gwn helper scripts
+
+The following small non-final helper scripts were archived:
+
+- gwn/experiments_transfer_effectiveness/run_tl_vs_scratch_pilot.sh
+- gwn/experiments_transfer_effectiveness/run_abcort_like_fixed_tl_hard3_seed5_fold0.sh
+- gwn/scripts/run_external_table2_final.sh
+
+Backup:
+
+- ../TCDV-TopoRT_cleanup_backups/round16_gwn_small_obsolete_scripts_20260627
+
+The external manifest is still retained:
+
+- gwn/configs/external_table2_final_manifest.csv
+
+It is referenced by final audit/table scripts and should not be removed.
