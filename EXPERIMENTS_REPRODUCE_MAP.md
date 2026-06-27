@@ -250,3 +250,15 @@ Dataset list:
 - `gwn/configs/external_all10_datasets.csv`
 
 The all10 list combines the previous six Table-2 external datasets with the four additional external datasets used for transfer-vs-scratch comparison.
+
+## External all10 transfer-vs-scratch result figure
+
+Existing all10 transfer-vs-scratch results are summarized and plotted by:
+
+- `gwn/experiments_transfer_effectiveness/138_make_all10_transfer_vs_scratch_figure.py`
+
+This script does not train models. It formats the already obtained all10 scratch and transfer-learning MAE values into paper-ready CSV/Markdown/TXT summaries and a bar figure.
+
+Output directory:
+
+- `gwn/experiments_transfer_effectiveness/all10_transfer_vs_scratch_final/`

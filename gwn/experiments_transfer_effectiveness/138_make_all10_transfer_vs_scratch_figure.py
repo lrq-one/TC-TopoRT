@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-OUT_DIR = Path("experiments_transfer_effectiveness/tl_vs_scratch_final_clean2")
+OUT_DIR = Path("experiments_transfer_effectiveness/all10_transfer_vs_scratch_final")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ============================================================
@@ -189,7 +189,7 @@ def main():
     plt.close()
 
     caption = (
-        "Figure 3. Comparison between transfer learning and scratch training across external chromatographic datasets. "
+        "Comparison between transfer learning and scratch training across the all10 external chromatographic datasets. "
         "Bars show MAE improvement, defined as scratch MAE minus transfer-learning MAE. "
         "Positive values indicate better performance from transfer learning."
     )
