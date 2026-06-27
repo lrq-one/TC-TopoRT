@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-122c_external_tcdv_fixed_autocal_from_wide.py
+external_stack_fixed_raw_autoselect.py
 
 No-leak fixed AutoCal / AutoSelect for external TCDV transfer predictions.
 
 Input:
-  external_tl_predictions.csv from 119_external_tcdv_scratch_vs_tl.py
+  external_tl_predictions.csv from external_train_tcdv_transfer_or_scratch.py
 
 This script:
 1. Reconstructs external cv_fold using the same KFold(cv_seed).

@@ -19,7 +19,7 @@ echo "=== Datasets for Figure4-style TL effectiveness ==="
 printf '%s\n' "${DATASETS[@]}"
 
 echo "=== TL pretrained branch ==="
-PYTHONPATH=. python -u experiments_transfer_effectiveness/119_external_tcdv_scratch_vs_tl.py \
+PYTHONPATH=. python -u experiments_transfer_effectiveness/external_train_tcdv_transfer_or_scratch.py \
   --out_dir experiments_transfer_effectiveness/results_figure4_tl_seed1_src0 \
   --datasets "${DATASETS[@]}" \
   --run_keys seed1 \
@@ -36,7 +36,7 @@ PYTHONPATH=. python -u experiments_transfer_effectiveness/119_external_tcdv_scra
   2>&1 | tee experiments_transfer_effectiveness/logs/figure4_tl_seed1_src0.log
 
 echo "=== Scratch random-init branch ==="
-PYTHONPATH=. python -u experiments_transfer_effectiveness/119_external_tcdv_scratch_vs_tl.py \
+PYTHONPATH=. python -u experiments_transfer_effectiveness/external_train_tcdv_transfer_or_scratch.py \
   --out_dir experiments_transfer_effectiveness/results_figure4_scratch_seed1 \
   --datasets "${DATASETS[@]}" \
   --run_keys seed1 \

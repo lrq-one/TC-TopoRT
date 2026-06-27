@@ -7,7 +7,7 @@ Run TCDV-TopoRT external transfer learning on the all10 external datasets.
 This is the paper-facing transfer-learning wrapper.
 
 It calls:
-  experiments_transfer_effectiveness/run_external_table2_fixed_raw_autoselect.py
+  experiments_transfer_effectiveness/external_run_fixed_raw_autoselect.py
 
 Protocol:
   - init_mode = tl
@@ -81,7 +81,7 @@ def main():
     cmd = [
         sys.executable,
         "-u",
-        "experiments_transfer_effectiveness/run_external_table2_fixed_raw_autoselect.py",
+        "experiments_transfer_effectiveness/external_run_fixed_raw_autoselect.py",
         "--out_root", args.out_root,
         "--cv_seeds", *map(str, args.cv_seeds),
         "--run_keys", *args.run_keys,

@@ -7,7 +7,7 @@ Run TCDV-TopoRT from-scratch training on the all10 external datasets.
 This is the paper-facing scratch-training wrapper.
 
 It calls:
-  experiments_transfer_effectiveness/119_external_tcdv_scratch_vs_tl.py
+  experiments_transfer_effectiveness/external_train_tcdv_transfer_or_scratch.py
 
 Protocol:
   - init_mode = scratch
@@ -100,7 +100,7 @@ def main():
     cmd = [
         sys.executable,
         "-u",
-        "experiments_transfer_effectiveness/119_external_tcdv_scratch_vs_tl.py",
+        "experiments_transfer_effectiveness/external_train_tcdv_transfer_or_scratch.py",
         "--out_dir", out_dir,
         "--datasets", *args.datasets,
         "--run_keys", args.run_key,

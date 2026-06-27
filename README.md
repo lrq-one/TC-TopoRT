@@ -278,7 +278,7 @@ It combines the previous six Table-2 external datasets with four additional exte
 
 Paper-facing wrapper:
 
-    gwn/experiments_transfer_effectiveness/136_external_transfer_all10.py
+    gwn/experiments_transfer_effectiveness/external_transfer_all10.py
 
 Shell entry point:
 
@@ -291,7 +291,7 @@ This line uses the TCDV-TopoRT transfer-learning protocol with fixed raw AutoSel
 
 Paper-facing wrapper:
 
-    gwn/experiments_transfer_effectiveness/137_external_scratch_all10.py
+    gwn/experiments_transfer_effectiveness/external_scratch_all10.py
 
 Shell entry point:
 
@@ -305,7 +305,7 @@ This line uses random initialization / scratch training on the same all10 extern
 The already obtained all10 transfer-vs-scratch MAE values are summarized and plotted by:
 
     cd gwn
-    python experiments_transfer_effectiveness/138_make_all10_transfer_vs_scratch_figure.py
+    python experiments_transfer_effectiveness/make_external_all10_transfer_vs_scratch_figure.py
 
 This script does not train models. It formats existing all10 scratch and transfer-learning MAE values into CSV, Markdown, TXT summaries, and a bar figure.
 

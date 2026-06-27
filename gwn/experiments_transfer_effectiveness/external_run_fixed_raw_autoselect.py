@@ -158,7 +158,7 @@ def main():
             cmd119 = [
                 sys.executable,
                 "-u",
-                "experiments_transfer_effectiveness/119_external_tcdv_scratch_vs_tl.py",
+                "experiments_transfer_effectiveness/external_train_tcdv_transfer_or_scratch.py",
                 "--out_dir", base_dir,
                 "--datasets", *args.datasets,
                 "--run_keys", *args.run_keys,
@@ -182,7 +182,7 @@ def main():
             cmd122c = [
                 sys.executable,
                 "-u",
-                "experiments_transfer_effectiveness/122c_external_tcdv_fixed_autocal_from_wide.py",
+                "experiments_transfer_effectiveness/external_stack_fixed_raw_autoselect.py",
                 "--pred_csv", base_csv,
                 "--out_dir", stack_dir,
                 "--cv_seed", str(cv_seed),

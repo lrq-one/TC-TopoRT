@@ -6,7 +6,7 @@ export PYTHONPATH=.
 
 mkdir -p experiments_transfer_effectiveness/logs
 
-python -u experiments_transfer_effectiveness/137_external_scratch_all10.py \
+python -u experiments_transfer_effectiveness/external_scratch_all10.py \
   --out_dir experiments_transfer_effectiveness/results_external_scratch_all10_seed5_cvseed1 \
   --run_key seed5 \
   --source_fold 0 \

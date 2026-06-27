@@ -19,14 +19,14 @@ do
   echo "cv_seed=${CVSEED}"
   echo "============================================================"
 
-  if python experiments_transfer_effectiveness/126_validate_122_base_predictions.py --pred_csv "${BASE_CSV}"
+  if python experiments_transfer_effectiveness/validate_external_base_predictions.py --pred_csv "${BASE_CSV}"
   then
     echo "[SKIP 119] base predictions are complete: ${BASE_CSV}"
   else
     echo "[RERUN 119] base predictions missing or incomplete. Remove and rerun: ${BASE_DIR}"
     rm -rf "${BASE_DIR}"
 
-    python -u experiments_transfer_effectiveness/119_external_tcdv_scratch_vs_tl.py \
+    python -u experiments_transfer_effectiveness/external_train_tcdv_transfer_or_scratch.py \
       --out_dir "${BASE_DIR}" \
       --datasets Eawag_XBridgeC18_364 FEM_lipids_72 FEM_long_412 IPB_Halle_82 LIFE_new_184 LIFE_old_194 \
       --run_keys seed5 \
@@ -51,7 +51,7 @@ do
     echo "[RUN 122] no-leak stack for cv_seed=${CVSEED}"
     rm -rf "${STACK_DIR}"
 
-    python -u experiments_transfer_effectiveness/122_external_tcdv_fixed_oof_stack.py \
+    python -u experiments_transfer_effectiveness/external_stack_fixed_oof.py \
       --pred_csv "${BASE_CSV}" \
       --out_dir "${STACK_DIR}" \
       --source_folds 0 1 2 3 4 \

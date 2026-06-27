@@ -144,13 +144,13 @@ Code directory:
 
 Important scripts:
 
-- gwn/experiments_transfer_effectiveness/119_external_tcdv_scratch_vs_tl.py
-- gwn/experiments_transfer_effectiveness/122_external_tcdv_fixed_oof_stack.py
-- gwn/experiments_transfer_effectiveness/122b_external_tcdv_fixed_oof_stack_from_wide.py
-- gwn/experiments_transfer_effectiveness/122c_external_tcdv_fixed_autocal_from_wide.py
-- gwn/experiments_transfer_effectiveness/126_validate_122_base_predictions.py
-- gwn/experiments_transfer_effectiveness/127_save_external_transfer_paper_package.py
-- gwn/experiments_transfer_effectiveness/run_external_table2_fixed_raw_autoselect.py
+- gwn/experiments_transfer_effectiveness/external_train_tcdv_transfer_or_scratch.py
+- gwn/experiments_transfer_effectiveness/external_stack_fixed_oof.py
+- gwn/experiments_transfer_effectiveness/external_stack_fixed_oof_from_wide.py
+- gwn/experiments_transfer_effectiveness/external_stack_fixed_raw_autoselect.py
+- gwn/experiments_transfer_effectiveness/validate_external_base_predictions.py
+- gwn/experiments_transfer_effectiveness/save_external_transfer_result_package.py
+- gwn/experiments_transfer_effectiveness/external_run_fixed_raw_autoselect.py
 
 Formal result package:
 
@@ -240,8 +240,8 @@ Future renaming should be done only after this map is complete.
 
 The cleaned external experiment wrappers are:
 
-- `gwn/experiments_transfer_effectiveness/136_external_transfer_all10.py`
-- `gwn/experiments_transfer_effectiveness/137_external_scratch_all10.py`
+- `gwn/experiments_transfer_effectiveness/external_transfer_all10.py`
+- `gwn/experiments_transfer_effectiveness/external_scratch_all10.py`
 - `gwn/experiments_transfer_effectiveness/run_transfer_all10_datasets.sh`
 - `gwn/experiments_transfer_effectiveness/run_scratch_all10_datasets.sh`
 
@@ -255,10 +255,25 @@ The all10 list combines the previous six Table-2 external datasets with the four
 
 Existing all10 transfer-vs-scratch results are summarized and plotted by:
 
-- `gwn/experiments_transfer_effectiveness/138_make_all10_transfer_vs_scratch_figure.py`
+- `gwn/experiments_transfer_effectiveness/make_external_all10_transfer_vs_scratch_figure.py`
 
 This script does not train models. It formats the already obtained all10 scratch and transfer-learning MAE values into paper-ready CSV/Markdown/TXT summaries and a bar figure.
 
 Output directory:
 
 - `gwn/experiments_transfer_effectiveness/all10_transfer_vs_scratch_final/`
+
+## Semantic external experiment script names
+
+The external transfer/scratch scripts were renamed from numbered development names to semantic task-oriented names.
+
+Main external experiment scripts:
+
+- `gwn/experiments_transfer_effectiveness/external_train_tcdv_transfer_or_scratch.py`
+- `gwn/experiments_transfer_effectiveness/external_run_fixed_raw_autoselect.py`
+- `gwn/experiments_transfer_effectiveness/external_stack_fixed_raw_autoselect.py`
+- `gwn/experiments_transfer_effectiveness/external_transfer_all10.py`
+- `gwn/experiments_transfer_effectiveness/external_scratch_all10.py`
+- `gwn/experiments_transfer_effectiveness/make_external_all10_transfer_vs_scratch_figure.py`
+
+The older numbered names were development-stage names and should not be used as the paper-facing entry points.
