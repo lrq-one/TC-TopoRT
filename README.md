@@ -250,3 +250,76 @@ Generated result folders, logs, local archives, and cached graph datasets are ig
 - The strict tautomer view must remain paired with the original SMRT order and label.
 - Do not tune the prediction-level stacker on the independent test set.
 - Use the OOF validation predictions to select stacking/fusion parameters.
+
+## External all10 transfer-vs-scratch reproduction
+
+The external transfer-vs-scratch comparison is organized into two clear lines: transfer learning and from-scratch training.
+
+### Dataset list
+
+The all10 external dataset list is stored in:
+
+    gwn/configs/external_all10_datasets.csv
+
+It combines the previous six Table-2 external datasets with four additional external datasets:
+
+    FEM_short_73
+    UniToyama_Atlantis_143
+    FEM_long_412
+    Eawag_XBridgeC18_364
+    LIFE_old_194
+    MTBLS87_147
+    LIFE_new_184
+    Cao_HILIC_116
+    IPB_Halle_82
+    FEM_lipids_72
+
+### Transfer-learning line
+
+Paper-facing wrapper:
+
+    gwn/experiments_transfer_effectiveness/136_external_transfer_all10.py
+
+Shell entry point:
+
+    cd gwn
+    bash experiments_transfer_effectiveness/run_transfer_all10_datasets.sh
+
+This line uses the TCDV-TopoRT transfer-learning protocol with fixed raw AutoSelect aggregation.
+
+### From-scratch line
+
+Paper-facing wrapper:
+
+    gwn/experiments_transfer_effectiveness/137_external_scratch_all10.py
+
+Shell entry point:
+
+    cd gwn
+    bash experiments_transfer_effectiveness/run_scratch_all10_datasets.sh
+
+This line uses random initialization / scratch training on the same all10 external datasets.
+
+### Existing all10 result summary and figure
+
+The already obtained all10 transfer-vs-scratch MAE values are summarized and plotted by:
+
+    cd gwn
+    python experiments_transfer_effectiveness/138_make_all10_transfer_vs_scratch_figure.py
+
+This script does not train models. It formats existing all10 scratch and transfer-learning MAE values into CSV, Markdown, TXT summaries, and a bar figure.
+
+Output directory:
+
+    gwn/experiments_transfer_effectiveness/all10_transfer_vs_scratch_final/
+
+### Relationship to core model code
+
+The external all10 wrappers do not change the core TCDV-TopoRT model implementation.
+
+Core model code remains under:
+
+    gwn/mp/
+    gwn/net/
+    gwn/train_oof_dualview_stack.py
+
