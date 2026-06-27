@@ -90,20 +90,20 @@ Purpose:
 
 After cleanup, diagnostics/ keeps only 14 SMRT / OOF / dual-view / figure / paper-analysis scripts:
 
-- 40_check_dualview_pair_data.py
-- 41_reorder_existing_taut_to_origin_order.py
+- check_dualview_pair_data.py
+- reorder_tautomer_csv_to_origin_order.py
 - 60_oof_ablation_subgroup_shuffle_error.py
 - 61_safe_fusion_scan.py
 - 62_integrity_stats_rtbin_stacker.py
 - 74a_inspect_tcdv_model_loading.py
-- 91_make_panelA_rdkit_views.py
-- 92_make_panelA_compact_white.py
-- 111_smrt_multiseed_result_audit.py
-- 112_smrt_main_from_final_metrics.py
-- 113_smrt_dualview_ablation_from_predictions.py
-- 114_smrt_taut_changed_subgroup.py
-- 115_smrt_shuffle_taut_pairing_ablation.py
-- 116_smrt_tail_hard_molecule_analysis.py
+- make_panelA_rdkit_views.py
+- make_panelA_compact_white.py
+- audit_smrt_multiseed_results.py
+- build_smrt_main_results_from_final_metrics.py
+- build_smrt_dualview_ablation_from_predictions.py
+- build_smrt_tautomer_changed_subgroup_results.py
+- build_smrt_shuffle_tautomer_pairing_ablation.py
+- analyze_smrt_tail_hard_molecules.py
 
 Purpose:
 
@@ -152,20 +152,20 @@ These are the structural ablation reproduction assets.
 
 ```text
 Remaining diagnostics files:
-ablations/gwn_cwn_structural_ablation/diagnostics/111_smrt_multiseed_result_audit.py
-ablations/gwn_cwn_structural_ablation/diagnostics/112_smrt_main_from_final_metrics.py
-ablations/gwn_cwn_structural_ablation/diagnostics/113_smrt_dualview_ablation_from_predictions.py
-ablations/gwn_cwn_structural_ablation/diagnostics/114_smrt_taut_changed_subgroup.py
-ablations/gwn_cwn_structural_ablation/diagnostics/115_smrt_shuffle_taut_pairing_ablation.py
-ablations/gwn_cwn_structural_ablation/diagnostics/116_smrt_tail_hard_molecule_analysis.py
-ablations/gwn_cwn_structural_ablation/diagnostics/40_check_dualview_pair_data.py
-ablations/gwn_cwn_structural_ablation/diagnostics/41_reorder_existing_taut_to_origin_order.py
+ablations/gwn_cwn_structural_ablation/diagnostics/audit_smrt_multiseed_results.py
+ablations/gwn_cwn_structural_ablation/diagnostics/build_smrt_main_results_from_final_metrics.py
+ablations/gwn_cwn_structural_ablation/diagnostics/build_smrt_dualview_ablation_from_predictions.py
+ablations/gwn_cwn_structural_ablation/diagnostics/build_smrt_tautomer_changed_subgroup_results.py
+ablations/gwn_cwn_structural_ablation/diagnostics/build_smrt_shuffle_tautomer_pairing_ablation.py
+ablations/gwn_cwn_structural_ablation/diagnostics/analyze_smrt_tail_hard_molecules.py
+ablations/gwn_cwn_structural_ablation/diagnostics/check_dualview_pair_data.py
+ablations/gwn_cwn_structural_ablation/diagnostics/reorder_tautomer_csv_to_origin_order.py
 ablations/gwn_cwn_structural_ablation/diagnostics/60_oof_ablation_subgroup_shuffle_error.py
 ablations/gwn_cwn_structural_ablation/diagnostics/61_safe_fusion_scan.py
 ablations/gwn_cwn_structural_ablation/diagnostics/62_integrity_stats_rtbin_stacker.py
 ablations/gwn_cwn_structural_ablation/diagnostics/74a_inspect_tcdv_model_loading.py
-ablations/gwn_cwn_structural_ablation/diagnostics/91_make_panelA_rdkit_views.py
-ablations/gwn_cwn_structural_ablation/diagnostics/92_make_panelA_compact_white.py
+ablations/gwn_cwn_structural_ablation/diagnostics/make_panelA_rdkit_views.py
+ablations/gwn_cwn_structural_ablation/diagnostics/make_panelA_compact_white.py
 
 Remaining diagnostics count:
 14

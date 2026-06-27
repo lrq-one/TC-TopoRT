@@ -35,9 +35,9 @@ TCDV-TopoRT uses three design choices.
     │   ├── SMRT_train_tautomer_strict_reorder_audit.csv
     │   └── SMRT_test_tautomer_strict_reorder_audit.csv
     ├── diagnostics/
-    │   ├── 40_check_dualview_pair_data.py
-    │   ├── 41_reorder_existing_taut_to_origin_order.py
-    │   └── 50_make_oof_paper_figures.py
+    │   ├── check_dualview_pair_data.py
+    │   ├── reorder_tautomer_csv_to_origin_order.py
+    │   └── make_smrt_oof_paper_figures.py
     ├── mp/                               # cell-complex data structures and CWN layers
     └── net/
         ├── cwn.py
@@ -114,7 +114,7 @@ Run the pairing diagnostic before training or after regenerating tautomer data:
 ```bash
 cd gwn
 
-PYTHONPATH=. python diagnostics/40_check_dualview_pair_data.py \
+PYTHONPATH=. python diagnostics/check_dualview_pair_data.py \
   --origin_train data/SMRT_train.csv \
   --origin_test data/SMRT_test.csv \
   --taut_train data_taut_strict_origin_order/SMRT_train_tautomer_strict.csv \

@@ -78,8 +78,8 @@ Main source predictions:
 
 Analysis code:
 
-- gwn/diagnostics/113_smrt_dualview_ablation_from_predictions.py
-- gwn/diagnostics/118_build_final_paper_tables.py
+- gwn/diagnostics/build_smrt_dualview_ablation_from_predictions.py
+- gwn/diagnostics/build_final_paper_tables.py
 
 Final table:
 
@@ -176,7 +176,7 @@ Important scripts:
 - gwn/experiments_transfer_effectiveness/133_external_scratch_only.py
 - gwn/experiments_transfer_effectiveness/134_external_tcdv_transfer_only.py
 - gwn/experiments_transfer_effectiveness/135_make_tl_vs_scratch_figure.py
-- gwn/experiments_transfer_effectiveness/run_figure4_tl_vs_scratch_full.sh
+- gwn/experiments_transfer_effectiveness/run_external_transfer_vs_scratch_full.sh
 
 Final outputs:
 
@@ -197,9 +197,9 @@ Code and analysis locations:
 - gwn/experiments_candidate_filtering
 - gwn/diagnostics/63_candidate_filtering_smrt_formula_pool.py  # archived in ../TCDV-TopoRT_cleanup_backups/round14_gwn_obsolete_diagnostics_code_20260627
 - gwn/diagnostics/86_eval_tl_rank_guard_and_soft_rerank.py  # archived in ../TCDV-TopoRT_cleanup_backups/round14_gwn_obsolete_diagnostics_code_20260627
-- gwn/diagnostics/97_eval_evaluable45_rank_guard_soft.py
-- gwn/diagnostics/99_make_final_experiment_A_table.py
-- gwn/diagnostics/108_make_final_riken_experiment_tables.py
+- gwn/diagnostics/evaluate_metabobase_rank_guard_soft.py
+- gwn/diagnostics/make_metabobase_candidate_filtering_table.py
+- gwn/diagnostics/make_riken_candidate_filtering_tables.py
 
 Formal results:
 
@@ -215,7 +215,7 @@ Preserved checkpoints:
 
 Code:
 
-- gwn/diagnostics/118_build_final_paper_tables.py
+- gwn/diagnostics/build_final_paper_tables.py
 
 Final result root:
 

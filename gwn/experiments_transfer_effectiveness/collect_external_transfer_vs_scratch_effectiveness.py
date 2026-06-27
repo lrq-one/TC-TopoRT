@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 ROOT = Path("experiments_transfer_effectiveness")
-OUT = ROOT / "figure4_tl_effectiveness"
+OUT = ROOT / "external_transfer_vs_scratch_effectiveness"
 OUT.mkdir(parents=True, exist_ok=True)
 
 PAPER = Path("final_paper_tables")
@@ -85,7 +85,7 @@ wide["TL_better_R2"] = wide["R2_improvement_abs"] > 0
 
 wide = wide.sort_values("MAE_improvement_s", ascending=False)
 
-wide.to_csv(OUT / "figure4_tl_effectiveness_summary.csv", index=False)
+wide.to_csv(OUT / "external_transfer_vs_scratch_effectiveness_summary.csv", index=False)
 wide.to_csv(PAPER / "Table_8_transfer_learning_effectiveness.csv", index=False)
 
 def bar_plot(df, col, ylabel, filename):
@@ -115,7 +115,7 @@ summary = {
     "R2_improvement_abs_mean": float(wide["R2_improvement_abs"].mean()),
 }
 
-pd.DataFrame([summary]).to_csv(OUT / "figure4_tl_effectiveness_overall_summary.csv", index=False)
+pd.DataFrame([summary]).to_csv(OUT / "external_transfer_vs_scratch_effectiveness_overall_summary.csv", index=False)
 
 md = []
 md.append("# Transfer-learning effectiveness summary\n\n")
@@ -133,7 +133,7 @@ if summary["MAE_improvement_mean"] > 0:
 else:
     md.append("Interpretation: under this controlled protocol, random initialization is competitive or better on average; the transfer-learning effect is dataset-dependent and should not be overclaimed.\n")
 
-(OUT / "figure4_tl_effectiveness_interpretation.md").write_text("".join(md), encoding="utf-8")
+(OUT / "external_transfer_vs_scratch_effectiveness_interpretation.md").write_text("".join(md), encoding="utf-8")
 
 print("\n=== TL vs Scratch summary ===")
 print(wide[[
@@ -149,9 +149,9 @@ for k, v in summary.items():
     print(f"{k}: {v}")
 
 print("\n[SAVE]", OUT / "figure4_tl_vs_scratch_by_mode.csv")
-print("[SAVE]", OUT / "figure4_tl_effectiveness_summary.csv")
-print("[SAVE]", OUT / "figure4_tl_effectiveness_overall_summary.csv")
-print("[SAVE]", OUT / "figure4_tl_effectiveness_interpretation.md")
+print("[SAVE]", OUT / "external_transfer_vs_scratch_effectiveness_summary.csv")
+print("[SAVE]", OUT / "external_transfer_vs_scratch_effectiveness_overall_summary.csv")
+print("[SAVE]", OUT / "external_transfer_vs_scratch_effectiveness_interpretation.md")
 print("[SAVE]", PAPER / "Table_8_transfer_learning_effectiveness.csv")
 print("[SAVE]", OUT / "Figure4A_MAE_improvement.png")
 print("[SAVE]", OUT / "Figure4B_MedAE_improvement.png")
