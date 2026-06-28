@@ -106,7 +106,7 @@ def main():
 
     rows.extend([
         {
-            "variant": "Full TCDV-TopoRT",
+            "variant": "Full TC-TopoRT",
             "mae": full_mae,
             "mae_std": 0.0,
             "group": "full",
@@ -134,7 +134,7 @@ def main():
         "Original view only",
         "Tautomer view only",
         "w/o ring 2-cells",
-        "Full TCDV-TopoRT",
+        "Full TC-TopoRT",
         "w/o CWN",
     ]
     df["order"] = df["variant"].map({v:i for i,v in enumerate(order)})
@@ -184,7 +184,7 @@ def main():
     )
 
     # Panel B: Delta MAE relative to Full
-    delta_df = df[df["variant"] != "Full TCDV-TopoRT"].copy()
+    delta_df = df[df["variant"] != "Full TC-TopoRT"].copy()
     y = np.arange(len(delta_df))
 
     axes[1].barh(

@@ -19,8 +19,8 @@ plt.rcParams.update({
 })
 
 FILES = {
-    "MetaboBase": ROOT / "ablations/gwn_cwn_structural_ablation/experiments_candidate_filtering/metabobase_evaluable45_rank_guard_soft_eval_seed42/rank_guard_soft_rerank_summary.csv",
-    "RIKEN-PlaSMA": ROOT / "ablations/gwn_cwn_structural_ablation/experiments_candidate_filtering/riken_exact85_rank_guard_soft_eval_seed42/rank_guard_soft_rerank_summary.csv",
+    "MetaboBase": ROOT / "gwn/experiments_candidate_filtering/metabobase_evaluable45_rank_guard_soft_eval_seed42/rank_guard_soft_rerank_summary.csv",
+    "RIKEN-PlaSMA": ROOT / "gwn/experiments_candidate_filtering/riken_exact85_rank_guard_soft_eval_seed42/rank_guard_soft_rerank_summary.csv",
 }
 
 TARGETS = {
@@ -182,7 +182,7 @@ def main():
         sel = final[final["dataset"] == dataset].iloc[0]
         rows.append({
             "dataset": dataset,
-            "method": "TCDV-TopoRT",
+            "method": "TC-TopoRT",
             "Reduction": float(sel["candidate_reduction_pct"]),
             "Top-1": float(sel["top1_after_pct"]),
             "Top-5": float(sel["top5_after_pct"]),
@@ -201,7 +201,7 @@ def main():
     for ax, dataset in zip(axes, datasets):
         sub = figdf[figdf["dataset"] == dataset]
         abc = sub[sub["method"] == "ABCoRT-TL"].iloc[0]
-        ours = sub[sub["method"] == "TCDV-TopoRT"].iloc[0]
+        ours = sub[sub["method"] == "TC-TopoRT"].iloc[0]
 
         x = np.arange(len(metrics))
         w = 0.35
@@ -219,7 +219,7 @@ def main():
             x + w / 2,
             [ours[m] for m in metrics],
             width=w,
-            label="TCDV-TopoRT",
+            label="TC-TopoRT",
             edgecolor="black",
             linewidth=0.5,
             alpha=0.85,

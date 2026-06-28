@@ -39,8 +39,8 @@ smrt = pd.DataFrame([
     ("RT-Transformer", 27.30),
     ("DeepGCN-RT", 26.55),
     ("ABCoRT", 25.75),
-    ("TCDV-TopoRT\nsingle-seed mean", 25.055),
-    ("TCDV-TopoRT\n5-seed ensemble", 24.920),
+    ("TC-TopoRT\nsingle-seed mean", 25.055),
+    ("TC-TopoRT\n5-seed ensemble", 24.920),
 ], columns=["method", "mae"])
 
 plt.figure(figsize=(7.2, 3.8))
@@ -100,7 +100,7 @@ abc_col = [c for c in cols if "abcort" in c.lower() and "mae" in c.lower()][0]
 plt.figure(figsize=(7.0, 3.8))
 x = np.arange(len(ext))
 w = 0.36
-plt.bar(x - w/2, ext[ours_col], width=w, label="TCDV-TopoRT", edgecolor="black", linewidth=0.5)
+plt.bar(x - w/2, ext[ours_col], width=w, label="TC-TopoRT", edgecolor="black", linewidth=0.5)
 plt.bar(x + w/2, ext[abc_col], width=w, label="ABCoRT-TL reported", edgecolor="black", linewidth=0.5)
 plt.ylabel("MAE (s)")
 plt.xticks(x, ext[dataset_col], rotation=30, ha="right")
@@ -140,7 +140,7 @@ for ax, ds in zip(axes, datasets):
     x = np.arange(len(metrics))
     w = 0.36
     ax.bar(x - w/2, [abc[m] for m in metrics], width=w, label="ABCoRT-TL reported", edgecolor="black", linewidth=0.5)
-    ax.bar(x + w/2, [ours[m] for m in metrics], width=w, label="TCDV-TopoRT", edgecolor="black", linewidth=0.5)
+    ax.bar(x + w/2, [ours[m] for m in metrics], width=w, label="TC-TopoRT", edgecolor="black", linewidth=0.5)
     ax.set_title(ds)
     ax.set_xticks(x)
     ax.set_xticklabels(metric_labels, rotation=25, ha="right")
