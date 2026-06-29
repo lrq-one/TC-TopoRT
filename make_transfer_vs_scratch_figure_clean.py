@@ -32,11 +32,32 @@ def find_input():
     raise FileNotFoundError("Cannot find transfer-vs-scratch input table.")
 
 
+
+LABEL_MAP = {
+    "FEM_short_73": "FEM-short",
+    "FEM_long_412": "FEM-long",
+    "UniToyama_Atlantis_143": "UniToyama-Atlantis",
+    "Eawag_XBridgeC18_364": "Eawag-XBridgeC18",
+    "FEM_lipids_72": "FEM-lipids",
+    "LIFE_old_194": "LIFE-old",
+    "LIFE_new_184": "LIFE-new",
+    "MTBLS87_147": "MTBLS87",
+    "IPB_Halle_82": "IPB-Halle",
+    "Cao_HILIC_116": "Cao-HILIC",
+}
+
 def clean_dataset_label(name: str) -> str:
     s = str(name).strip()
-    s = re.sub(r"_\d+$", "", s)
-    s = s.replace("_", " ")
-    return s
+    if s in LABEL_MAP:
+        return LABEL_MAP[s]
+
+    s2 = re.sub(r"_\d+$", "", s)
+    if s2 in LABEL_MAP:
+        return LABEL_MAP[s2]
+
+    return s2.replace("_", "-")
+
+
 
 
 def pick_col(df, candidates):
