@@ -1,7 +1,6 @@
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
 ROOT = Path(".").resolve()
@@ -12,16 +11,16 @@ OUT_PDF = OUT_DIR / "fig3_candidate_filtering_summary.pdf"
 OUT_PNG = OUT_DIR / "fig3_candidate_filtering_summary.png"
 
 # ============================================================
-# Data aligned with updated Table 2
+# Data
 # ============================================================
 datasets = ["MetaboBase", "RIKEN-PlaSMA"]
 
-# A
+# Panel A
 initial = [3023, 5044]
 retained = [933, 2712]
 reduction_tc = [69.14, 46.23]
 
-# B
+# Panel B
 reduction_baselines = {
     "RT-Transformer-TL": [8.18, 11.14],
     "DeepGCN-RT-TL": [29.64, 35.37],
@@ -29,7 +28,7 @@ reduction_baselines = {
     "TC-TopoRT": [69.14, 46.23],
 }
 
-# C
+# Panel C
 topk_labels = ["Top-1", "Top-5", "Top-10"]
 topk_methods = [
     "MS-FINDER only / No RT",
@@ -55,20 +54,20 @@ topk_riken = {
     "TC-TopoRT": [54.12, 77.65, 89.41],
 }
 
-# D
+# Panel D
 true_retention = [93.33, 97.65]
 fn_text = ["FN = 3 / 45", "FN = 2 / 85"]
 
 # ============================================================
-# Style: keep original compact 2x2 style
+# Style
 # ============================================================
 plt.rcParams.update({
     "font.family": "DejaVu Sans",
-    "font.size": 7.4,
-    "axes.titlesize": 8.2,
-    "axes.labelsize": 7.7,
-    "xtick.labelsize": 6.9,
-    "ytick.labelsize": 6.9,
+    "font.size": 7.2,
+    "axes.titlesize": 8.0,
+    "axes.labelsize": 7.6,
+    "xtick.labelsize": 6.7,
+    "ytick.labelsize": 6.7,
     "legend.fontsize": 5.8,
     "pdf.fonttype": 42,
     "ps.fonttype": 42,
@@ -90,14 +89,6 @@ method_colors = {
     "DeepGCN-RT-TL": C_DGCN,
     "ABCoRT-TL": C_ABC,
     "TC-TopoRT": C_TC,
-}
-
-method_markers = {
-    "MS-FINDER only / No RT": "o",
-    "RT-Transformer-TL": "s",
-    "DeepGCN-RT-TL": "^",
-    "ABCoRT-TL": "D",
-    "TC-TopoRT": "P",
 }
 
 def style_ax(ax, grid_axis="y"):
@@ -124,15 +115,15 @@ def panel_title(ax, letter, title):
         va="bottom",
     )
 
-fig = plt.figure(figsize=(7.45, 5.15))
+fig = plt.figure(figsize=(7.55, 5.25))
 gs = fig.add_gridspec(
     2, 2,
     left=0.075,
     right=0.985,
     top=0.955,
-    bottom=0.145,
+    bottom=0.185,
     wspace=0.35,
-    hspace=0.55,
+    hspace=0.62,
 )
 
 # ============================================================
@@ -143,17 +134,15 @@ style_ax(axA, "y")
 panel_title(axA, "A", "Candidate-space reduction by TC-TopoRT")
 
 x = np.arange(len(datasets))
-w = 0.28
+w = 0.34
 
 b_init = axA.bar(
     x - w / 2, initial, width=w,
-    color=C_INIT, edgecolor="#777777", linewidth=0.65,
-    label="Initial"
+    color=C_INIT, edgecolor="#7A7A7A", linewidth=0.65, label="Initial"
 )
 b_ret = axA.bar(
     x + w / 2, retained, width=w,
-    color=C_RETAIN, edgecolor="#4F438C", linewidth=0.65,
-    label="Retained"
+    color=C_RETAIN, edgecolor="#51468A", linewidth=0.65, label="Retained"
 )
 
 axA.set_xticks(x)
@@ -164,10 +153,10 @@ axA.set_ylim(0, 6500)
 axA.legend(
     frameon=False,
     loc="upper left",
-    bbox_to_anchor=(0.01, 0.98),
+    bbox_to_anchor=(0.00, 0.98),
     ncol=2,
     handlelength=1.1,
-    columnspacing=0.8,
+    columnspacing=0.7,
     handletextpad=0.35,
 )
 
@@ -175,38 +164,32 @@ for bars in [b_init, b_ret]:
     for b in bars:
         h = b.get_height()
         axA.text(
-            b.get_x() + b.get_width() / 2,
-            h + 95,
+            b.get_x() + b.get_width()/2,
+            h + 85,
             f"{int(h)}",
-            ha="center",
-            va="bottom",
-            fontsize=6.7,
+            ha="center", va="bottom", fontsize=6.6
         )
 
-# 保留原来第一版那种简洁 reduction 标注
 for i, red in enumerate(reduction_tc):
-    y_text = max(initial[i], retained[i]) + 540
     axA.text(
         x[i],
-        y_text,
+        max(initial[i], retained[i]) + 420,
         f"{red:.2f}% reduction",
         ha="center",
         va="bottom",
-        fontsize=7.0,
+        fontsize=6.9,
         color=C_TC,
         fontweight="bold",
     )
 
 # ============================================================
-# B. Candidate reduction comparison
+# B. Reduction comparison
 # ============================================================
 axB = fig.add_subplot(gs[0, 1])
 style_ax(axB, "y")
 panel_title(axB, "B", "Candidate reduction compared with RT-filtering baselines")
 
 methods_B = ["RT-Transformer-TL", "DeepGCN-RT-TL", "ABCoRT-TL", "TC-TopoRT"]
-colors_B = [C_RTTR, C_DGCN, C_ABC, C_TC]
-
 xB = np.arange(len(datasets))
 wB = 0.17
 offsets = np.array([-1.5, -0.5, 0.5, 1.5]) * wB
@@ -217,21 +200,16 @@ for j, method in enumerate(methods_B):
         xB + offsets[j],
         vals,
         width=wB,
-        color=colors_B[j],
+        color=method_colors[method],
         edgecolor="#666666",
         linewidth=0.55,
         label=method,
     )
-    # 只标 TC-TopoRT，避免重新挤乱
     if method == "TC-TopoRT":
         for b, v in zip(bars, vals):
             axB.text(
-                b.get_x() + b.get_width() / 2,
-                v + 1.2,
-                f"{v:.2f}",
-                ha="center",
-                va="bottom",
-                fontsize=6.4,
+                b.get_x() + b.get_width()/2, v + 1.0, f"{v:.2f}",
+                ha="center", va="bottom", fontsize=6.3
             )
 
 axB.set_xticks(xB)
@@ -239,30 +217,18 @@ axB.set_xticklabels(datasets)
 axB.set_ylabel("Reduction (%)")
 axB.set_ylim(0, 82)
 
-# 图例放右上空白处，不压标题
 axB.legend(
     frameon=False,
     loc="upper right",
-    bbox_to_anchor=(0.99, 0.99),
+    bbox_to_anchor=(0.995, 1.01),
     ncol=2,
-    fontsize=5.8,
     handlelength=1.1,
-    columnspacing=0.75,
+    columnspacing=0.6,
     handletextpad=0.35,
 )
 
-# 文献说明放整图底部，保持第一版风格
-fig.text(
-    0.52,
-    0.055,
-    "RT-Transformer-TL and DeepGCN-RT-TL are literature-reported reduction-rate baselines from the ABCoRT study.",
-    ha="center",
-    va="center",
-    fontsize=5.8,
-)
-
 # ============================================================
-# C. Top-k prioritization comparison
+# C. Top-k prioritization comparison  -> grouped BAR
 # ============================================================
 outerC = fig.add_subplot(gs[1, 0])
 outerC.axis("off")
@@ -283,60 +249,94 @@ outerC.text(
     va="bottom",
 )
 
-subC = gs[1, 0].subgridspec(1, 2, wspace=0.30)
-axC1 = fig.add_subplot(subC[0, 0])
-axC2 = fig.add_subplot(subC[0, 1], sharey=axC1)
+legend_labels_short = {
+    "MS-FINDER only / No RT": "MSF only / No RT",
+    "RT-Transformer-TL": "RT-Transf.-TL",
+    "DeepGCN-RT-TL": "DeepGCN-RT-TL",
+    "ABCoRT-TL": "ABCoRT-TL",
+    "TC-TopoRT": "TC-TopoRT",
+}
 
-xC = np.arange(len(topk_labels))
-
-for ax, title, data in [
-    (axC1, "MetaboBase", topk_metabobase),
-    (axC2, "RIKEN-PlaSMA", topk_riken),
-]:
-    style_ax(ax, "y")
-    for method in topk_methods:
-        ax.plot(
-            xC,
-            data[method],
-            color=method_colors[method],
-            marker=method_markers[method],
-            linewidth=1.20,
-            markersize=3.4,
-            label=method,
-        )
-
-    ax.set_xticks(xC)
-    ax.set_xticklabels(topk_labels)
-    ax.set_ylim(30, 95)
-    ax.set_title(title, fontsize=7.3, pad=3)
-
-axC1.set_ylabel("Accuracy (%)")
-axC2.tick_params(labelleft=False)
-
-# 图例放在 C panel 下方，紧凑但不压图
-handles_C = [
-    Line2D(
-        [0], [0],
-        color=method_colors[m],
-        marker=method_markers[m],
-        linewidth=1.20,
-        markersize=3.4,
-        label=m,
+legend_handles = [
+    Patch(
+        facecolor=method_colors[m],
+        edgecolor="#666666",
+        linewidth=0.45,
+        label=legend_labels_short[m],
     )
     for m in topk_methods
 ]
 
-outerC.legend(
-    handles=handles_C,
+# C panel legend: horizontal, placed below x-axis area
+legC = outerC.legend(
+    handles=legend_handles,
     frameon=False,
-    loc="lower center",
-    bbox_to_anchor=(0.55, -0.31),
-    ncol=2,
-    fontsize=5.7,
-    handlelength=1.5,
-    columnspacing=0.85,
-    handletextpad=0.40,
+    loc="upper center",
+    bbox_to_anchor=(0.50, -0.13),
+    ncol=3,
+    columnspacing=0.90,
+    handlelength=1.10,
+    handletextpad=0.35,
+    borderaxespad=0.0,
+    fontsize=5.3,
 )
+
+# 关键：legend 横向放在标题下面，不放到底部
+legend_labels_short = {
+    "MS-FINDER only / No RT": "MSF only / No RT",
+    "RT-Transformer-TL": "RT-Transf.-TL",
+    "DeepGCN-RT-TL": "DeepGCN-RT-TL",
+    "ABCoRT-TL": "ABCoRT-TL",
+    "TC-TopoRT": "TC-TopoRT",
+}
+legend_handles = [
+    Patch(
+        facecolor=method_colors[m],
+        edgecolor="#666666",
+        linewidth=0.45,
+        label=legend_labels_short[m]
+    )
+    for m in topk_methods
+]
+
+# 给 C 面板上方留更多空位，避免 legend 压子图
+subC = gs[1, 0].subgridspec(1, 2, wspace=0.22)
+axC1 = fig.add_subplot(subC[0, 0])
+axC2 = fig.add_subplot(subC[0, 1], sharey=axC1)
+
+def draw_topk_grouped_bar(ax, title, data):
+    style_ax(ax, "y")
+    ax.set_title(title, fontsize=7.2, pad=2)
+
+    x = np.arange(len(topk_labels))
+    w = 0.14
+    offsets = np.linspace(-2, 2, len(topk_methods)) * w
+
+    for j, method in enumerate(topk_methods):
+        vals = data[method]
+        ax.bar(
+            x + offsets[j],
+            vals,
+            width=w,
+            color=method_colors[method],
+            edgecolor="#666666",
+            linewidth=0.45,
+        )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(topk_labels)
+    ax.set_ylim(30, 95)
+
+draw_topk_grouped_bar(axC1, "MetaboBase", topk_metabobase)
+draw_topk_grouped_bar(axC2, "RIKEN-PlaSMA", topk_riken)
+
+axC1.set_ylabel("Accuracy (%)")
+axC2.tick_params(labelleft=False)
+
+# 把子图整体往下压一点，避免和上面的 legend 打架
+for ax in [axC1, axC2]:
+    pos = ax.get_position()
+    ax.set_position([pos.x0, pos.y0 + 0.018, pos.width, pos.height * 0.82])
 
 # ============================================================
 # D. True-candidate retention and false negatives
@@ -351,7 +351,7 @@ barsD = axD.bar(
     true_retention,
     width=0.46,
     color=C_TC,
-    edgecolor="#4F438C",
+    edgecolor="#51468A",
     linewidth=0.65,
 )
 
@@ -362,28 +362,29 @@ axD.set_ylim(0, 106)
 
 for b, rt, fn in zip(barsD, true_retention, fn_text):
     axD.text(
-        b.get_x() + b.get_width() / 2,
-        rt + 1.2,
+        b.get_x() + b.get_width()/2,
+        rt + 1.1,
         f"{rt:.2f}%",
-        ha="center",
-        va="bottom",
-        fontsize=7.0,
-        fontweight="bold",
+        ha="center", va="bottom",
+        fontsize=6.9, fontweight="bold"
     )
     axD.text(
-        b.get_x() + b.get_width() / 2,
-        rt - 8.5,
+        b.get_x() + b.get_width()/2,
+        rt - 7.0,
         fn,
-        ha="center",
-        va="top",
-        fontsize=7.0,
-        color=C_FN,
-        fontweight="bold",
+        ha="center", va="top",
+        fontsize=6.8, color=C_FN, fontweight="bold"
     )
 
 # ============================================================
-# Save
+# Bottom note
 # ============================================================
+fig.text(
+    0.52, 0.018,
+    "RT-Transformer-TL and DeepGCN-RT-TL are literature-reported reduction-rate baselines from the ABCoRT study.",
+    ha="center", va="center", fontsize=5.6
+)
+
 fig.savefig(OUT_PDF, bbox_inches="tight", pad_inches=0.03)
 fig.savefig(OUT_PNG, dpi=600, bbox_inches="tight", pad_inches=0.03)
 plt.close(fig)
