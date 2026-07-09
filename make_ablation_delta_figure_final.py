@@ -1,223 +1,246 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 from pathlib import Path
-import json
-import numpy as np
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 
-ROOT = Path.cwd()
-OUT = ROOT / "manuscript_figures_final"
-OUT.mkdir(parents=True, exist_ok=True)
+ROOT = Path(".").resolve()
+OUT_DIR = ROOT / "manuscript_figures_final"
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-GWN = ROOT / "gwn"
-ABL = ROOT / "ablations" / "gwn_cwn_structural_ablation"
+OUT_PNG = OUT_DIR / "fig_ablation_delta_mae_final.png"
+OUT_PDF = OUT_DIR / "fig_ablation_delta_mae_final.pdf"
 
-plt.rcParams.update({
-    "font.family": "DejaVu Sans",
-    "font.size": 9,
-    "axes.linewidth": 0.8,
-    "pdf.fonttype": 42,
-    "ps.fonttype": 42,
-})
+CANDIDATES = [
+    ROOT / "manuscript_figures_final/source_ablation_delta_final.csv",
+    ROOT / "gwn/final_paper_tables/source_ablation_delta_final.csv",
+]
 
-def load_full_seed5():
-    p = GWN / "results_OOF_DualView_Stack_seed5" / "final_metrics.json"
-    m = json.loads(p.read_text())
-    return m["test_final"]
+# ------------------------------------------------------------
+# visual style: keep close to your old blue-toned figure
+# ------------------------------------------------------------
+COLOR_MAP = {
+    "Original view only": "#1f78b4",
+    "Tautomer view only": "#1f78b4",
+    "w/o ring 2-cells": "#1f78b4",
+    "Full TC-TopoRT": "#1f78b4",
+    "Full model": "#1f78b4",
+    "w/o CWN": "#1f78b4",
+}
 
-def load_no2cell():
-    p = ABL / "results_Ablation_No2Cell_DualView_Stack_seed5" / "final_metrics.json"
-    m = json.loads(p.read_text())
-    return m["test_final"]
+EDGE = "#1c4e6e"
+GRID = "#d9d9d9"
 
-def load_cwn0():
-    p = ABL / "results_Ablation_CWN0_DualView_Stack_seed5" / "final_metrics.json"
-    m = json.loads(p.read_text())
-    return m["test_final"]
+DISPLAY_MAP = {
+    "Original view only": "Original",
+    "Tautomer view only": "Tautomer",
+    "w/o ring 2-cells": "w/o ring\n2-cells",
+    "Full TC-TopoRT": "Full",
+    "Full model": "Full",
+    "w/o CWN": "w/o CWN",
+}
 
-def single_view_5seed_metrics():
-    seed_dirs = [
-        GWN / "results_OOF_DualView_Stack_v1",
-        GWN / "results_OOF_DualView_Stack_seed5",
-        GWN / "results_OOF_DualView_Stack_seed79",
-        GWN / "results_OOF_DualView_Stack_seed123",
-        GWN / "results_OOF_DualView_Stack_seed256",
-    ]
+LEFT_ORDER = [
+    "Original view only",
+    "Tautomer view only",
+    "w/o ring 2-cells",
+    "Full TC-TopoRT",
+]
 
-    rows = []
-    for d in seed_dirs:
-        p = d / "test_predictions.csv"
-        df = pd.read_csv(p)
-        y = df["Actual_RT"].to_numpy(float)
-        for name, col in [
-            ("Original view only", "Origin_Test_Pred"),
-            ("Tautomer view only", "Taut_Test_Pred"),
-        ]:
-            pred = df[col].to_numpy(float)
-            mae = np.mean(np.abs(pred - y))
-            medae = np.median(np.abs(pred - y))
-            rmse = np.sqrt(np.mean((pred - y) ** 2))
-            r2 = 1.0 - np.sum((y - pred) ** 2) / np.sum((y - y.mean()) ** 2)
-            rows.append({
-                "variant": name,
-                "seed_dir": d.name,
-                "mae": mae,
-                "medae": medae,
-                "rmse": rmse,
-                "r2": r2,
-            })
+RIGHT_ORDER = [
+    "Original view only",
+    "Tautomer view only",
+    "w/o ring 2-cells",
+    "w/o CWN",
+]
 
-    df = pd.DataFrame(rows)
-    agg = (
-        df.groupby("variant", as_index=False)
-          .agg(
-              mae=("mae", "mean"),
-              mae_std=("mae", "std"),
-              medae=("medae", "mean"),
-              rmse=("rmse", "mean"),
-              r2=("r2", "mean"),
-          )
+
+def find_input():
+    for p in CANDIDATES:
+        if p.exists():
+            return p
+    raise FileNotFoundError(
+        "Cannot find ablation source CSV.\n"
+        "Expected one of:\n" + "\n".join(str(p) for p in CANDIDATES)
     )
-    return agg
+
+
+def load_df():
+    p = find_input()
+    df = pd.read_csv(p)
+
+    if "variant" not in df.columns or "mae" not in df.columns:
+        raise RuntimeError(f"Unexpected columns in {p}: {df.columns.tolist()}")
+
+    # normalize one naming variant
+    df["variant"] = df["variant"].replace({"Full model": "Full TC-TopoRT"})
+    if "mae_std" not in df.columns:
+        df["mae_std"] = 0.0
+
+    return p, df
+
+
+def get_row(df, name):
+    sub = df[df["variant"] == name]
+    if len(sub) == 0:
+        raise KeyError(f"Missing variant: {name}")
+    return sub.iloc[0]
+
 
 def main():
-    sv = single_view_5seed_metrics()
+    in_path, df = load_df()
 
-    full = load_full_seed5()
-    no2 = load_no2cell()
-    cwn0 = load_cwn0()
+    full_mae = float(get_row(df, "Full TC-TopoRT")["mae"])
 
-    # 用 seed5 Full 作为结构消融同 seed 基准
-    full_mae = float(full["mae"])
+    left_vals, left_std, left_labels, left_colors = [], [], [], []
+    for name in LEFT_ORDER:
+        row = get_row(df, name)
+        left_vals.append(float(row["mae"]))
+        left_std.append(float(row.get("mae_std", 0.0)))
+        left_labels.append(DISPLAY_MAP[name])
+        left_colors.append(COLOR_MAP[name])
 
-    rows = []
+    right_vals, right_labels, right_colors = [], [], []
+    for name in RIGHT_ORDER:
+        row = get_row(df, name)
+        delta = float(row["mae"]) - full_mae
+        right_vals.append(delta)
+        right_labels.append(DISPLAY_MAP[name])
+        right_colors.append(COLOR_MAP.get(name, "#1f78b4"))
 
-    # single-view 是 5 seed mean
-    for _, r in sv.iterrows():
-        rows.append({
-            "variant": r["variant"],
-            "mae": float(r["mae"]),
-            "mae_std": float(r["mae_std"]),
-            "group": "single-view/fusion",
-            "note": "five-seed mean of single-view 5-fold predictions",
-        })
+    plt.close("all")
+    fig = plt.figure(figsize=(7.0, 3.15))
+    gs = fig.add_gridspec(1, 2, width_ratios=[1.0, 1.0], wspace=0.33)
 
-    rows.extend([
-        {
-            "variant": "Full TC-TopoRT",
-            "mae": full_mae,
-            "mae_std": 0.0,
-            "group": "full",
-            "note": "seed5 final OOF-stacked model",
-        },
-        {
-            "variant": "w/o ring 2-cells",
-            "mae": float(no2["mae"]),
-            "mae_std": 0.0,
-            "group": "structural",
-            "note": "seed5, max ring size set to 2",
-        },
-        {
-            "variant": "w/o CWN",
-            "mae": float(cwn0["mae"]),
-            "mae_std": 0.0,
-            "group": "structural",
-            "note": "seed5, CWN layers set to 0",
-        },
-    ])
-
-    df = pd.DataFrame(rows)
-
-    order = [
-        "Original view only",
-        "Tautomer view only",
-        "w/o ring 2-cells",
-        "Full TC-TopoRT",
-        "w/o CWN",
-    ]
-    df["order"] = df["variant"].map({v:i for i,v in enumerate(order)})
-    df = df.sort_values("order").drop(columns=["order"])
-
-    df["delta_mae_vs_full"] = df["mae"] - full_mae
-    df.to_csv(OUT / "source_ablation_delta_final.csv", index=False)
-
-    print("\n=== Ablation metrics ===")
-    print(df[["variant", "mae", "mae_std", "delta_mae_vs_full", "note"]].to_string(index=False))
-
-    # ---------------------------
-    # Figure: two-panel
-    # ---------------------------
-    fig, axes = plt.subplots(1, 2, figsize=(9.2, 3.7))
-
-    # Panel A: zoomed MAE near 25
-    small_df = df[df["variant"] != "w/o CWN"].copy()
-    x = np.arange(len(small_df))
-
-    axes[0].bar(
-        x,
-        small_df["mae"],
-        yerr=small_df["mae_std"].replace(0, np.nan),
-        capsize=3,
-        edgecolor="black",
-        linewidth=0.6,
-    )
-    axes[0].axhline(full_mae, linestyle="--", linewidth=1.0)
-    axes[0].set_xticks(x)
-    axes[0].set_xticklabels(
-        ["Original", "Tautomer", "w/o ring\n2-cells", "Full"],
-        rotation=0,
-        ha="center",
-    )
-    axes[0].set_ylabel("MAE (s)")
-    axes[0].set_title("(A) Zoomed comparison near Full model")
-    axes[0].set_ylim(24.95, 25.35)
-
-    for i, r in small_df.reset_index(drop=True).iterrows():
-        axes[0].text(i, r["mae"] + 0.018, f'{r["mae"]:.3f}', ha="center", va="bottom", fontsize=8)
-
-    axes[0].text(
-        3, full_mae - 0.035,
-        "Full baseline",
-        ha="center", va="top", fontsize=7
+    # ============================================================
+    # Panel A
+    # ============================================================
+    ax1 = fig.add_subplot(gs[0, 0])
+    x1 = np.arange(len(left_vals))
+    bars1 = ax1.bar(
+        x1,
+        left_vals,
+        yerr=left_std,
+        color=left_colors,
+        edgecolor=EDGE,
+        linewidth=0.8,
+        capsize=2.5,
+        width=0.62,
+        zorder=3,
     )
 
-    # Panel B: Delta MAE relative to Full
-    delta_df = df[df["variant"] != "Full TC-TopoRT"].copy()
-    y = np.arange(len(delta_df))
+    baseline = full_mae
+    ymin = min(min(left_vals), baseline) - 0.06
+    ymax = max(left_vals) + max(left_std + [0]) + 0.06
 
-    axes[1].barh(
-        y,
-        delta_df["delta_mae_vs_full"],
-        edgecolor="black",
-        linewidth=0.6,
+    ax1.axhline(
+        baseline,
+        color="#8ebad3",
+        linestyle="--",
+        linewidth=1.0,
+        zorder=1,
     )
-    axes[1].axvline(0, color="black", linewidth=0.8)
-    axes[1].set_yticks(y)
-    axes[1].set_yticklabels(
-        ["Original", "Tautomer", "w/o ring 2-cells", "w/o CWN"]
+
+    ax1.set_ylim(ymin, ymax)
+    ax1.set_xticks(x1)
+    ax1.set_xticklabels(left_labels, fontsize=7.2)
+    ax1.set_ylabel("MAE (s)", fontsize=7.8)
+    ax1.set_title("(A) Zoomed comparison near Full model", fontsize=7.8, pad=4)
+
+    ax1.grid(axis="y", linestyle="--", linewidth=0.5, color=GRID, alpha=0.7, zorder=0)
+    ax1.set_axisbelow(True)
+
+    for rect, val in zip(bars1, left_vals):
+        ax1.text(
+            rect.get_x() + rect.get_width() / 2,
+            rect.get_height() + 0.008,
+            f"{val:.3f}" if val < 25.1 else f"{val:.3f}".rstrip("0").rstrip("."),
+            ha="center",
+            va="bottom",
+            fontsize=6.9,
+            color="#222222",
+        )
+
+    # ============================================================
+    # Panel B
+    # ============================================================
+    ax2 = fig.add_subplot(gs[0, 1])
+    y2 = np.arange(len(right_vals))
+
+    bars2 = ax2.barh(
+        y2,
+        right_vals,
+        color=right_colors,
+        edgecolor=EDGE,
+        linewidth=0.8,
+        height=0.58,
+        zorder=3,
     )
-    axes[1].set_xlabel(r"$\Delta$MAE vs Full (s)")
-    axes[1].set_title("(B) Error increase after removing components")
-    axes[1].set_xlim(0, max(delta_df["delta_mae_vs_full"]) * 1.12)
 
-    for i, r in delta_df.reset_index(drop=True).iterrows():
-        val = r["delta_mae_vs_full"]
-        axes[1].text(val + 0.15, i, f'+{val:.3f}', va="center", fontsize=8)
+    ax2.set_yticks(y2)
+    ax2.set_yticklabels(right_labels, fontsize=7.2)
+    ax2.invert_yaxis()
+    ax2.set_xlabel(r"$\Delta$MAE vs Full (s)", fontsize=7.8)
+    ax2.set_title("(B) Error increase after removing components", fontsize=7.8, pad=4)
 
-    axes[1].invert_yaxis()
+    xmax = max(right_vals) + 3.6
+    ax2.set_xlim(0, xmax)
+    ax2.set_xticks(np.arange(0, np.ceil(xmax) + 0.1, 2))
+    ax2.grid(axis="x", linestyle="--", linewidth=0.5, color=GRID, alpha=0.7, zorder=0)
+    ax2.set_axisbelow(True)
 
-    plt.tight_layout()
+    # important: label stays INSIDE plotting area with visible margin
+    right_margin = 1.8
+    outside_offset = 0.14
+    inside_offset = 0.22
 
-    pdf = OUT / "fig_ablation_delta_mae_final.pdf"
-    png = OUT / "fig_ablation_delta_mae_final.png"
-    plt.savefig(pdf, bbox_inches="tight")
-    plt.savefig(png, dpi=300, bbox_inches="tight")
-    plt.close()
+    for rect, val in zip(bars2, right_vals):
+        y = rect.get_y() + rect.get_height() / 2
+        txt = f"+{val:.3f}"
 
-    print("\n[SAVE]", pdf)
-    print("[SAVE]", png)
+        proposed = val + outside_offset
+        if proposed <= xmax - right_margin:
+            # normal case: put outside bar, but still inside frame
+            ax2.text(
+                proposed,
+                y,
+                txt,
+                ha="left",
+                va="center",
+                fontsize=6.9,
+                color="#222222",
+                clip_on=True,
+            )
+        else:
+            # if too close to border, place slightly inside the bar end
+            ax2.text(
+                max(val - inside_offset, 0.05),
+                y,
+                txt,
+                ha="right",
+                va="center",
+                fontsize=6.9,
+                color="white",
+                bbox=dict(facecolor=COLOR_MAP.get("w/o CWN", "#1f78b4"), edgecolor="#1c567a", pad=0.18),
+            )
+
+    # spine / ticks
+    for ax in (ax1, ax2):
+        for spine in ax.spines.values():
+            spine.set_linewidth(0.8)
+            spine.set_color("#444444")
+        ax.tick_params(axis="both", labelsize=7.0, length=3.0, width=0.8)
+
+    fig.subplots_adjust(left=0.08, right=0.985, top=0.90, bottom=0.18)
+
+    fig.savefig(OUT_PDF, bbox_inches="tight", pad_inches=0.02)
+    fig.savefig(OUT_PNG, dpi=600, bbox_inches="tight", pad_inches=0.02)
+
+    print("[INPUT]", in_path.relative_to(ROOT))
+    print("[SAVE]", OUT_PDF.relative_to(ROOT))
+    print("[SAVE]", OUT_PNG.relative_to(ROOT))
+    print()
+    print(df[["variant", "mae", "mae_std"]].to_string(index=False))
+
 
 if __name__ == "__main__":
     main()
