@@ -121,7 +121,7 @@ gs = fig.add_gridspec(
     left=0.075,
     right=0.985,
     top=0.955,
-    bottom=0.185,
+    bottom=0.135,
     wspace=0.35,
     hspace=0.62,
 )
@@ -381,7 +381,7 @@ for b, rt, fn in zip(barsD, true_retention, fn_text):
 # ============================================================
 fig.text(
     0.52, 0.018,
-    "RT-Transformer-TL and DeepGCN-RT-TL are literature-reported reduction-rate baselines from the ABCoRT study.",
+    "",
     ha="center", va="center", fontsize=5.6
 )
 
