@@ -33,7 +33,7 @@ dual_stds  = np.array([0.054, 0.070, 0.038, 0.039])
 
 full_mae = 25.012
 struct_labels = [
-    "Full TC-TopoRT\n(seed 5)",
+    "Full TC-TopoRT",
     "w/o explicit\nring 2-cells",
     "Atom-bond GNN\n(same protocol)",
     "w/o CWN\nmessage passing",
