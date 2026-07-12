@@ -21,10 +21,10 @@ TC-TopoRT combines three principal design components:
 
 ```text
 .
-├── build_tautomer_strict_csv.py          # strict tautomer CSV generator
+├── build_tautomer_strict_csv.py          # strict tautomer-standardized CSV generator
 ├── README.md
 └── gwn/
-    ├── train_oof_dualview_stack.py       # main TCDV-TopoRT training/evaluation entry
+    ├── train_oof_dualview_stack.py       # main TC-TopoRT training/evaluation entry
     ├── run_oof_multiseed_5runs.sh        # multi-seed OOF runs
     ├── data/
     │   ├── SMRT_train.csv
@@ -74,7 +74,7 @@ conda activate lrq_q
 
 ## Data
 
-The final repository includes the official SMRT split and the paired strict tautomer-canonical view:
+The final repository includes the official SMRT split and the paired strict tautomer-standardized view:
 
 ```text
 gwn/data/SMRT_train.csv
@@ -94,9 +94,9 @@ Train strict tautomer changed: 37724 / 70182
 Test strict tautomer changed : 4242 / 7798
 ```
 
-## Regenerate strict tautomer data
+## Regenerate strict tautomer-standardized data
 
-The strict tautomer CSV generator now uses the repository-internal `gwn/data/` files by default and writes generated outputs to a non-final output directory to avoid overwriting the curated paired data.
+The strict tautomer-standardization generator uses the repository-internal `gwn/data/` files by default and writes generated outputs to a non-final output directory to avoid overwriting the curated paired data.
 
 ```bash
 python build_tautomer_strict_csv.py \
@@ -109,7 +109,7 @@ The generated files should be checked before use.
 
 ## Check original/tautomer pairing
 
-Run the pairing diagnostic before training or after regenerating tautomer data:
+Run the pairing diagnostic before training or after regenerating tautomer-standardized data:
 
 ```bash
 cd gwn
@@ -123,9 +123,9 @@ PYTHONPATH=. python diagnostics/check_dualview_pair_data.py \
 
 A successful check should report zero RT mismatch and pass both TRAIN and TEST pair checks.
 
-## Train TCDV-TopoRT
+## Train TC-TopoRT
 
-Run a single 5-fold OOF dual-view stack experiment:
+Run a single five-fold OOF dual-view stack experiment:
 
 ```bash
 cd gwn
@@ -191,7 +191,7 @@ PYTHONPATH=. python train_oof_dualview_stack.py \
   --out_dir results_OOF_DualView_Stack_v1
 ```
 
-For a complete 5-fold dual-view run, the resume sanity check should print 10 cached-load messages:
+For a complete five-fold dual-view run, the resume sanity check should print 10 cached-load messages:
 
 ```text
 5 folds × 2 views = 10 [RESUME] messages
@@ -211,9 +211,9 @@ train_oof_dualview_stack.py
 
 `TopoCellRTCWNReplace` uses a CWN adapter to obtain three topology-aware tokens per molecule: atom-token, bond-token, and ring-token. These tokens are transformed, pooled, gated, combined with 24-dimensional molecular global context, and finally passed to the RT regression head.
 
-## Final local 5-seed result
+## Final SMRT results
 
-The final local 5-seed test summary was:
+The five-run TC-TopoRT-S summary was:
 
 ```text
 MAE   : 25.0551 ± 0.0391 s
@@ -226,6 +226,8 @@ P99   : 282.7597 ± 4.0937 s
 >200s : 134.2 ± 2.2 molecules
 Bias  : 1.7807 ± 0.1121 s
 ```
+
+The molecule-wise five-seed ensemble, TC-TopoRT-E, achieved an MAE of `24.920 s` on the retained-compound SMRT test set.
 
 The selected final prediction-level stacker was `huber_stack`.
 
@@ -246,14 +248,14 @@ Generated result folders, logs, local archives, and cached graph datasets are ig
 
 ## Notes
 
-- The repository keeps the final TCDV-TopoRT route only.
-- The strict tautomer view must remain paired with the original SMRT order and label.
+- The repository keeps the final TC-TopoRT workflow only.
+- The strict tautomer-standardized view must remain paired with the dataset-provided SMRT view in the original row order and under the same RT label.
 - Do not tune the prediction-level stacker on the independent test set.
-- Use the OOF validation predictions to select stacking/fusion parameters.
+- Use training-set OOF predictions to select stacking and fusion parameters.
 
 ## External all10 transfer-vs-scratch reproduction
 
-The external transfer-vs-scratch comparison is organized into two clear lines: transfer learning and from-scratch training.
+The external transfer-vs-scratch comparison is organized into two lines: transfer learning and training from scratch.
 
 ### Dataset list
 
@@ -261,7 +263,7 @@ The all10 external dataset list is stored in:
 
     gwn/configs/external_all10_datasets.csv
 
-It combines the previous six Table-2 external datasets with four additional external datasets:
+It combines the six external datasets used for comparison with published transfer-learning references and four additional external datasets:
 
     FEM_short_73
     UniToyama_Atlantis_143
@@ -285,7 +287,7 @@ Shell entry point:
     cd gwn
     bash experiments_transfer_effectiveness/run_transfer_all10_datasets.sh
 
-This line uses the TCDV-TopoRT transfer-learning protocol with fixed raw AutoSelect aggregation.
+This line uses the TC-TopoRT transfer-learning protocol with fixed raw AutoSelect aggregation.
 
 ### From-scratch line
 
@@ -298,11 +300,11 @@ Shell entry point:
     cd gwn
     bash experiments_transfer_effectiveness/run_scratch_all10_datasets.sh
 
-This line uses random initialization / scratch training on the same all10 external datasets.
+This line uses random initialization and scratch training on the same ten external datasets.
 
 ### Existing all10 result summary and figure
 
-The already obtained all10 transfer-vs-scratch MAE values are summarized and plotted by:
+The existing all10 transfer-vs-scratch MAE values are summarized and plotted by:
 
     cd gwn
     python experiments_transfer_effectiveness/make_external_all10_transfer_vs_scratch_figure.py
@@ -315,11 +317,10 @@ Output directory:
 
 ### Relationship to core model code
 
-The external all10 wrappers do not change the core TCDV-TopoRT model implementation.
+The external all10 wrappers do not modify the core TC-TopoRT model implementation.
 
 Core model code remains under:
 
     gwn/mp/
     gwn/net/
     gwn/train_oof_dualview_stack.py
-
