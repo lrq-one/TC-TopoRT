@@ -1,33 +1,32 @@
 # TC-TopoRT
 
-TC-TopoRT is a topology-aware framework for small-molecule retention-time prediction and RT-guided candidate prioritization.
+TC-TopoRT is a topology-aware framework for small-molecule retention-time prediction and retention-time-guided candidate prioritization.
 
-It combines:
+This public repository intentionally contains only the reproducibility entry points, the minimal model/data code required by those entry points, the SMRT paired views, and the compact candidate-filtering source tables. Historical experiments, diagnostics, checkpoints, logs, generated figures, manuscript copies, and backup files are not included in the current file tree.
 
-- paired original and strict tautomer-canonical molecular views;
+## Method overview
+
+TC-TopoRT combines:
+
+- paired dataset-provided and strict tautomer-canonical molecular views;
 - ring-aware cell complexes with atom, bond, and ring cells;
-- topology-aware CWN message passing;
+- CWN-based topology-aware message passing;
 - leakage-free out-of-fold prediction-level fusion;
-- external transfer learning;
-- RT-guided candidate filtering and soft reranking.
+- external transfer-learning evaluation;
+- guarded RT filtering and soft reranking of MS-FINDER candidates.
 
 ## Reported results
 
-### SMRT prediction
+### SMRT
 
-- TC-TopoRT-S: **25.055 ± 0.039 s MAE**
-- TC-TopoRT-E, five-seed ensemble: **24.920 s MAE**
-- Seeds: `1, 5, 79, 123, 256`
+- TC-TopoRT-S: **25.055 ± 0.039 s MAE** across five seeds.
+- TC-TopoRT-E: **24.920 s MAE** for the five-seed ensemble.
+- Seeds: `1, 5, 79, 123, 256`.
+- Conventional atom-bond GNN comparison: **28.252 s MAE**.
 
-The conventional atom-bond GNN baseline obtained **28.252 s MAE**, which is 3.240 s higher than TC-TopoRT seed 5.
+### External transfer
 
-### External transfer learning
-
-Across ten external datasets:
-
-- transfer learning achieved lower MAE on **8/10 datasets**;
-- mean MAE improvement: **9.164 s**;
-- median MAE improvement: **3.677 s**.
+Across ten external datasets, transfer learning reduced MAE on **8/10 datasets**, with a mean improvement of **9.164 s** and a median improvement of **3.677 s**.
 
 ### Candidate filtering
 
@@ -38,145 +37,130 @@ Across ten external datasets:
 
 ## Repository structure
 
-~~~text
-scripts/
-├── training/    SMRT training entries
-├── data/        paired-view construction and validation
-├── ablation/    structural and atom-bond GNN ablations
-├── transfer/    external transfer and scratch workflows
-├── filtering/   candidate filtering and sensitivity analysis
-└── figures/     public figure-generation entries
+```text
+.
+├── README.md
+├── environment.yml
+├── requirements.txt
+├── data/
+│   ├── ablation/
+│   └── candidate_filtering/
+├── gwn/
+│   ├── train_oof_dualview_stack.py
+│   ├── mp/                         # cell-complex data structures and CWN layers
+│   ├── net/                        # TC-TopoRT model definition
+│   ├── data/                       # dataset-provided SMRT split
+│   ├── data_taut_strict_origin_order/
+│   └── paper_analysis_stage4_external/README.md
+└── scripts/
+    ├── training/
+    ├── data/
+    ├── ablation/
+    ├── transfer/
+    ├── filtering/
+    └── figures/
+```
 
-data/
-├── candidate_filtering/
-└── ablation/
-
-artifacts/
-├── cache/
-├── results/
-└── figures/
-~~~
-
-Generated outputs under `artifacts/` are excluded from Git.
+All generated caches, checkpoints, predictions, metrics, logs, tables, and figures are written under `artifacts/`, which is excluded from Git.
 
 ## Installation
 
 Using Conda:
 
-~~~bash
+```bash
 conda env create -f environment.yml
 conda activate tc-toport
-~~~
+```
 
 Using pip:
 
-~~~bash
+```bash
 python -m pip install -r requirements.txt
-~~~
+```
 
-PyTorch and PyTorch Geometric may need installation commands compatible with the local CUDA version.
+PyTorch Geometric extension wheels may need to be installed for the local PyTorch/CUDA combination.
+
+## SMRT data
+
+The repository includes the dataset-provided SMRT split and the paired strict tautomer-canonical view:
+
+```text
+gwn/data/SMRT_train.csv
+gwn/data/SMRT_test.csv
+gwn/data_taut_strict_origin_order/SMRT_train_tautomer_strict.csv
+gwn/data_taut_strict_origin_order/SMRT_test_tautomer_strict.csv
+```
+
+After the `rt > 300 s` and RDKit-validity filters, the retained split contains 70,182 training molecules and 7,798 test molecules. Strict tautomer canonicalization changes 37,724 training representations and 4,242 test representations while preserving molecular formulae.
 
 ## Reproduction
 
-Run all commands from the repository root.
+Run commands from the repository root.
 
-### 1. Build and validate paired SMRT views
+### 1. Rebuild and validate the paired views
 
-~~~bash
+```bash
 bash scripts/data/rebuild_strict_tautomer_views.sh
 bash scripts/data/validate_smrt_paired_views.sh
-~~~
+```
 
-Expected validation:
+### 2. Train one SMRT seed
 
-~~~text
-Train: 70,182
-Test: 7,798
-Train changed: 37,724
-Test changed: 4,242
-Formula preserved: all
-Invalid SMILES: 0
-~~~
-
-### 2. Train TC-TopoRT
-
-Single seed:
-
-~~~bash
+```bash
 bash scripts/training/run_smrt_single_seed.sh 5
-~~~
+```
 
-Five seeds:
+The seed can also be supplied through the `SEED` environment variable. To inspect the generated command without starting training:
 
-~~~bash
+```bash
+DRY_RUN=1 bash scripts/training/run_smrt_single_seed.sh 5
+```
+
+### 3. Train all five paper seeds
+
+```bash
 bash scripts/training/run_smrt_five_seeds.sh
-~~~
+```
 
-Outputs are written under `artifacts/results/smrt/`.
+### 4. Structural and atom-bond ablations
 
-### 3. Structural ablations
-
-~~~bash
+```bash
 bash scripts/ablation/run_structural_ablation.sh no2cell
 bash scripts/ablation/run_structural_ablation.sh cwn0
-~~~
-
-### 4. Atom-bond GNN baseline
-
-~~~bash
 bash scripts/ablation/run_atom_bond_gnn.sh
-~~~
+```
 
-### 5. External transfer and scratch experiments
+### 5. Candidate filtering
 
-~~~bash
-python scripts/transfer/train_scratch_all10.py
-python scripts/transfer/train_transfer_all10.py
-~~~
-
-The combined comparison table is written to:
-
-~~~text
-artifacts/results/external_transfer/Table_8_transfer_learning_effectiveness.csv
-~~~
-
-### 6. Candidate filtering
-
-~~~bash
+```bash
 python scripts/filtering/run_candidate_filtering.py
 python scripts/filtering/run_filtering_sensitivity.py
-~~~
+```
+
+The compact candidate-level inputs are included under `data/candidate_filtering/`.
+
+### 6. External transfer and scratch comparison
+
+The transfer scripts are included, but the three processed external PredRet input tables are not redistributed in this repository. Supply them through the command-line arguments documented in `gwn/paper_analysis_stage4_external/README.md`.
+
+```bash
+python scripts/transfer/train_scratch_all10.py --help
+python scripts/transfer/train_transfer_all10.py --help
+```
+
+Transfer learning also expects the SMRT source-fold checkpoints produced by the SMRT workflow under `artifacts/results/smrt/`.
 
 ### 7. Generate figures
 
-~~~bash
+```bash
 python scripts/figures/make_candidate_filtering_figure.py
-python scripts/figures/make_transfer_figure.py
 python scripts/figures/make_ablation_figure.py
+python scripts/figures/make_transfer_figure.py
 python scripts/figures/make_smrt_figures.py
-~~~
-
-The SMRT figure entry expects:
-
-~~~text
-artifacts/results/smrt/seed5/test_predictions.csv
-~~~
-
-A different result directory can be supplied with:
-
-~~~bash
-python scripts/figures/make_smrt_figures.py \
-  --result_dir artifacts/results/smrt/<result-directory>
-~~~
+```
 
 ## Leakage control
 
-The paired molecular views share identical labels and splits. Prediction-level fusion is fitted from out-of-fold training predictions. Independent test labels are not used for model selection, stacker fitting, calibration, or filtering-parameter optimization.
+The original and tautomer-canonical views share identical labels and split assignments. Prediction-level fusion is fitted only from training-set out-of-fold predictions. Independent test labels are not used for model selection, stacker fitting, calibration, or filtering-parameter optimization.
 
-The candidate-filtering comparisons use consistent candidate lists, query sets, experimental RT values, original MS-FINDER ranks, filtering rules, reranking definitions, and evaluation metrics.
-
-## Data policy
-
-The public candidate-filtering CSV files and the compact ablation source table are included under `data/`.
-
-Large caches, checkpoints, weights, logs, generated predictions, tables, and figures remain under `artifacts/` and are not committed.
+Candidate-filtering comparisons use consistent candidate lists, query sets, experimental RT values, original MS-FINDER ranks, guarded-retention rules, soft-reranking definitions, and evaluation metrics.

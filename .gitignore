@@ -1,90 +1,33 @@
-*.pyc
-*.txt
-*.log
-*.json
-*.csv
-*.pt
-*.pkl
+# Python caches
 __pycache__/
-# local archives / legacy backups
-_archive_legacy/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
+# Local environments
+.venv/
+venv/
+.env
 
-# logs
-*.log
-logs/
-gwn/logs/
+# Editors and operating-system files
+.vscode/
+.idea/
+.DS_Store
 
-# model checkpoints and large binaries
-*.pth
-*.pt
-*.ckpt
-model_dict/
-
-# generated result folders / caches
-gwn/results_OOF_DualView_Stack_*/
-gwn/smrt_cwn_oof_*/
-gwn/smrt_cwn_data_*/
-gwn/smrt_topocellrt_*/
-gwn/paper_final_results_TCDV_TopoRT_*.tar.gz
-
-# generated tautomer outputs
+# Generated TC-TopoRT outputs
+artifacts/
 gwn/data_taut_strict_generated/
 
-# Local external datasets for transfer/filtering experiments
-gwn/external_data/
-
-# ===== TCDV-TopoRT local experiment artifacts =====
-/ablations/
-/gwn/results_*/
-/gwn/final_*/
-/gwn/paper_analysis*/
-/gwn/*_work*/
-/gwn/h2_work*/
-/gwn/dualview_work*/
-/gwn/smrt_*_train/
-/gwn/smrt_*_test/
-/gwn/experiments_transfer_effectiveness/results_*/
-/gwn/experiments_transfer_effectiveness/logs/
-/gwn/experiments_transfer_effectiveness/fixed_raw_autoselect_table2/results_*/
-/gwn/experiments_transfer_effectiveness/fixed_raw_autoselect_table2/*.csv
-
-# model/checkpoint/cache
+# Checkpoints, caches, logs, and temporary files
 *.pth
 *.pt
 *.ckpt
-*.npy
-*.npz
 *.pkl
 *.joblib
+*.npy
+*.npz
 *.log
-__pycache__/
-*.pyc
-
-# local analysis outputs
 *.tmp
 *.bak
-
-# Submission public-data whitelist
-
-# Generated experiment outputs
-artifacts/
-
-# Public candidate-filtering inputs
-!data/candidate_filtering/
-!data/candidate_filtering/*.csv
-
-# Public ablation source table
-!data/ablation/*.csv
-
-# Public reproducibility source tables
-!data/
-!data/ablation/
-!data/ablation/source_ablation_delta_final.csv
-
-# Public environment specification
-!requirements.txt
+*~
