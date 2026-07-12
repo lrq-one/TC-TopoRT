@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from pathlib import Path
+from decimal import Decimal, ROUND_HALF_UP
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -27,6 +28,15 @@ def savefig(name):
     print("[SAVE]", OUT / f"{name}.pdf")
     print("[SAVE]", OUT / f"{name}.png")
 
+
+def format_half_up(value, digits=2):
+    quantum = Decimal("1").scaleb(-digits)
+    rounded = Decimal(str(float(value))).quantize(
+        quantum,
+        rounding=ROUND_HALF_UP,
+    )
+    return f"{rounded:.{digits}f}"
+
 # ============================================================
 # Figure: SMRT benchmark MAE
 # ============================================================
@@ -50,7 +60,7 @@ plt.ylabel("MAE (s)")
 plt.xticks(x, smrt["method"], rotation=35, ha="right")
 plt.ylim(20, max(smrt["mae"]) + 4)
 for i, v in enumerate(smrt["mae"]):
-    plt.text(i, v + 0.35, f"{v:.2f}", ha="center", va="bottom", fontsize=8)
+    plt.text(i, v + 0.35, format_half_up(v, 2), ha="center", va="bottom", fontsize=8)
 plt.title("SMRT benchmark performance")
 savefig("fig_smrt_benchmark_mae")
 
