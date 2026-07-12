@@ -222,14 +222,55 @@ def make_tradeoff_rows(dataset_name, grid):
 
 def plot_tradeoff(dataset_name, grid, selected, abcort, out_dir):
     """
-    Plot candidate reduction versus Top-10 identification.
+    Publication-ready Figure S7 panel.
 
-    A dedicated empty annotation band is reserved on the right side of
-    the axes. Selected-point labels are placed in this band so that they
-    do not cover sensitivity-grid points, overlap each other, or extend
-    outside the figure boundary.
+    The x-axis is extended to create a dedicated annotation region inside
+    the black axes frame. Selected-point labels therefore do not cover the
+    stars or sensitivity-grid points and do not extend beyond the axes.
     """
-    fig, ax = plt.subplots(figsize=(8.9, 5.7))
+
+    title_map = {
+        "MetaboBase_evaluable45": "MetaboBase",
+        "RIKEN_exact85": "RIKEN-PlaSMA",
+        "MetaboBase": "MetaboBase",
+        "RIKEN-PlaSMA": "RIKEN-PlaSMA",
+    }
+
+    point_meta = {
+        "balanced": {
+            "legend": "Main operating point",
+            "label": "Main operating point",
+            "color": "#2CA02C",
+        },
+        "high_reduction": {
+            "legend": "Higher-reduction point",
+            "label": "Higher-reduction point",
+            "color": "#D62728",
+        },
+    }
+
+    # Vertical positions for annotation boxes.
+    label_y_map = {
+        "MetaboBase_evaluable45": {
+            "balanced": 90.0,
+            "high_reduction": 84.9,
+        },
+        "MetaboBase": {
+            "balanced": 90.0,
+            "high_reduction": 84.9,
+        },
+        "RIKEN_exact85": {
+            "balanced": 89.7,
+            "high_reduction": 87.3,
+        },
+        "RIKEN-PlaSMA": {
+            "balanced": 89.7,
+            "high_reduction": 87.3,
+        },
+    }
+
+    # Wider canvas so the enlarged black axes frame remains readable.
+    fig, ax = plt.subplots(figsize=(10.8, 5.9))
 
     # ------------------------------------------------------------
     # Sensitivity grid
@@ -237,26 +278,27 @@ def plot_tradeoff(dataset_name, grid, selected, abcort, out_dir):
     ax.scatter(
         grid["candidate_reduction_pct"],
         grid["top10_after_pct"],
-        s=24,
-        alpha=0.22,
+        s=22,
+        alpha=0.24,
         color="#5DA5DA",
         label="Sensitivity grid",
         zorder=2,
     )
 
+    # Five-metric non-dominated set
     pareto = grid[grid["is_pareto_5metric"]].copy()
     ax.scatter(
         pareto["candidate_reduction_pct"],
         pareto["top10_after_pct"],
-        s=34,
-        alpha=0.85,
+        s=40,
+        alpha=0.90,
         color="#F28E2B",
-        label="Non-dominated points",
+        label="Five-metric non-dominated points",
         zorder=3,
     )
 
     # ------------------------------------------------------------
-    # Data ranges and dedicated right-side annotation band
+    # Enlarge the black axes frame itself
     # ------------------------------------------------------------
     x_min = float(grid["candidate_reduction_pct"].min())
     x_max = float(grid["candidate_reduction_pct"].max())
@@ -265,37 +307,23 @@ def plot_tradeoff(dataset_name, grid, selected, abcort, out_dir):
 
     x_span = max(x_max - x_min, 1.0)
 
-    left_pad = max(3.0, 0.04 * x_span)
-    right_band = max(18.0, 0.25 * x_span)
+    left_pad = max(2.0, 0.03 * x_span)
 
-    ax.set_xlim(x_min - left_pad, x_max + right_band)
-    ax.set_ylim(y_min - 0.8, y_max + 2.5)
+    # Large dedicated annotation band inside the axes.
+    annotation_band = max(28.0, 0.38 * x_span)
 
-    # The labels begin strictly to the right of every sensitivity point.
-    label_x = x_max + max(2.2, 0.035 * x_span)
+    ax.set_xlim(
+        x_min - left_pad,
+        x_max + annotation_band,
+    )
 
-    # Vertical placement is dataset-specific to avoid label overlap.
-    label_y_offsets = {
-        "MetaboBase_evaluable45": {
-            "balanced": 1.05,
-            "high_reduction": 0.50,
-        },
-        "RIKEN_exact85": {
-            "balanced": 0.65,
-            "high_reduction": 0.45,
-        },
-    }
+    ax.set_ylim(
+        y_min - 0.8,
+        y_max + 1.6,
+    )
 
-    selected_styles = {
-        "balanced": {
-            "color": "#2CA02C",
-            "legend": "Selected: balanced",
-        },
-        "high_reduction": {
-            "color": "#D62728",
-            "legend": "Selected: high_reduction",
-        },
-    }
+    # Annotation boxes begin several units to the right of all data points.
+    label_x = x_max + max(4.0, 0.06 * x_span)
 
     # ------------------------------------------------------------
     # Selected operating points
@@ -306,110 +334,123 @@ def plot_tradeoff(dataset_name, grid, selected, abcort, out_dir):
         if len(sub) != 1:
             raise RuntimeError(
                 f"Selected point not uniquely found: "
-                f"{dataset_name}, {point_name}, {method_id}"
+                f"dataset={dataset_name}, point={point_name}, method={method_id}"
             )
 
         r = sub.iloc[0]
+        meta = point_meta[point_name]
 
         x0 = float(r["candidate_reduction_pct"])
         y0 = float(r["top10_after_pct"])
-        style = selected_styles[point_name]
 
+        # Keep the stars clearly visible above all other elements.
         ax.scatter(
             [x0],
             [y0],
-            s=300,
+            s=380,
             marker="*",
-            color=style["color"],
+            color=meta["color"],
             edgecolor="white",
-            linewidth=0.8,
-            label=style["legend"],
-            zorder=7,
+            linewidth=1.0,
+            label=meta["legend"],
+            zorder=15,
         )
 
-        y_offset = label_y_offsets.get(dataset_name, {}).get(
+        threshold = int(round(float(r["threshold_sec"])))
+        guard = int(round(float(r["guard_k"])))
+        tau = float(r["tau"])
+        alpha = float(r["alpha"])
+
+        label_text = (
+            f"{meta['label']}\n"
+            f"T = {threshold} s, g = {guard}\n"
+            f"τ = {tau:.2f} s, α = {alpha:.1f}"
+        )
+
+        text_y = label_y_map.get(dataset_name, {}).get(
             point_name,
-            0.50,
+            y0,
         )
-        text_y = y0 + y_offset
 
-        # Prevent the upper label from touching the title or top boundary.
-        text_y = min(text_y, ax.get_ylim()[1] - 0.75)
-
-        label = (
-            f"{point_name}\n"
-            f"T={r['threshold_sec']}, g={r['guard_k']}\n"
-            f"τ={r['tau']}, α={r['alpha']}"
-        )
+        text_y = min(text_y, ax.get_ylim()[1] - 0.55)
+        text_y = max(text_y, ax.get_ylim()[0] + 0.55)
 
         ax.annotate(
-            label,
+            label_text,
             xy=(x0, y0),
+            xycoords="data",
             xytext=(label_x, text_y),
             textcoords="data",
             ha="left",
             va="center",
-            fontsize=8.6,
+            fontsize=9.0,
             linespacing=1.08,
             color="#303030",
             bbox=dict(
-                boxstyle="round,pad=0.28",
+                boxstyle="round,pad=0.34",
                 facecolor="white",
-                edgecolor=style["color"],
-                linewidth=0.65,
-                alpha=0.97,
+                edgecolor=meta["color"],
+                linewidth=0.9,
+                alpha=0.98,
             ),
             arrowprops=dict(
                 arrowstyle="-",
-                color=style["color"],
-                linewidth=0.85,
-                shrinkA=5,
-                shrinkB=7,
-                connectionstyle="arc3,rad=0.03",
+                color=meta["color"],
+                linewidth=1.0,
+                shrinkA=7,
+                shrinkB=8,
+                connectionstyle="arc3,rad=0.02",
             ),
             annotation_clip=False,
-            zorder=8,
+            zorder=10,
         )
 
     # ------------------------------------------------------------
-    # ABCoRT-TL reference lines
+    # Formal labels
     # ------------------------------------------------------------
-    ax.axvline(
-        abcort["reduction"],
-        linestyle="--",
-        linewidth=1.0,
-        color="#1F77B4",
-        label="ABCoRT-TL reduction",
-        zorder=1,
-    )
-
-    ax.axhline(
-        abcort["top10"],
-        linestyle="--",
-        linewidth=1.0,
-        color="#1F77B4",
-        label="ABCoRT-TL Top10",
-        zorder=1,
-    )
-
-    ax.set_xlabel("Candidate reduction (%)")
-    ax.set_ylabel("Top10 identification (%)")
+    ax.set_xlabel("Candidate-space reduction (%)", fontsize=11)
+    ax.set_ylabel("Top-10 accuracy (%)", fontsize=11)
     ax.set_title(
-        f"{dataset_name}: sensitivity of RT-aware guarded soft reranking",
-        pad=10,
+        title_map.get(dataset_name, dataset_name),
+        fontsize=14,
+        pad=12,
     )
 
     ax.grid(True, linewidth=0.3, alpha=0.4)
     ax.set_axisbelow(True)
+    ax.tick_params(axis="both", labelsize=10)
 
-    # Legend remains in the left-bottom region, away from annotations.
+    # Make the enlarged black frame visually clear.
+    for spine in ax.spines.values():
+        spine.set_linewidth(1.0)
+        spine.set_color("#222222")
+
+    # Remove duplicate legend entries.
+    handles, labels = ax.get_legend_handles_labels()
+    unique_handles = []
+    unique_labels = []
+    seen = set()
+
+    for handle, label in zip(handles, labels):
+        if label not in seen:
+            seen.add(label)
+            unique_handles.append(handle)
+            unique_labels.append(label)
+
     ax.legend(
-        fontsize=8,
+        unique_handles,
+        unique_labels,
+        fontsize=9,
         loc="lower left",
-        framealpha=0.94,
+        framealpha=0.95,
     )
 
-    fig.tight_layout(pad=1.0)
+    fig.subplots_adjust(
+        left=0.085,
+        right=0.975,
+        bottom=0.14,
+        top=0.90,
+    )
 
     png = out_dir / f"{dataset_name}_sensitivity_tradeoff_reduction_vs_top10.png"
     pdf = out_dir / f"{dataset_name}_sensitivity_tradeoff_reduction_vs_top10.pdf"
@@ -418,11 +459,13 @@ def plot_tradeoff(dataset_name, grid, selected, abcort, out_dir):
         png,
         dpi=300,
         bbox_inches="tight",
+        pad_inches=0.08,
         facecolor="white",
     )
     fig.savefig(
         pdf,
         bbox_inches="tight",
+        pad_inches=0.08,
         facecolor="white",
     )
 
