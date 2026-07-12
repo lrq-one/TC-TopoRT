@@ -1,326 +1,182 @@
 # TC-TopoRT
 
-TC-TopoRT is a tautomer-consistent and topology-aware framework for small-molecule retention time (RT) prediction and RT-assisted metabolite annotation.
+TC-TopoRT is a topology-aware framework for small-molecule retention-time prediction and RT-guided candidate prioritization.
 
-The current repository contains the final **TC-TopoRT** implementation. For each SMRT compound, the framework constructs two paired molecular views:
+It combines:
 
-1. the dataset-provided SMILES graph;
-2. a strict tautomer-standardized graph generated through conservative tautomer canonicalization under identity-preserving checks, without changing the experimental RT label or the original train/test split.
+- paired original and strict tautomer-canonical molecular views;
+- ring-aware cell complexes with atom, bond, and ring cells;
+- topology-aware CWN message passing;
+- leakage-free out-of-fold prediction-level fusion;
+- external transfer learning;
+- RT-guided candidate filtering and soft reranking.
 
-Each view is encoded by a CWN-based topology-aware model that learns atom-, bond-, and ring-level molecular representations. The out-of-fold (OOF) predictions from the two views are subsequently integrated through a prediction-level Huber stacker fitted only on training-set OOF predictions.
+## Reported results
 
-## Key idea
+### SMRT prediction
 
-TC-TopoRT combines three principal design components:
+- TC-TopoRT-S: **25.055 ± 0.039 s MAE**
+- TC-TopoRT-E, five-seed ensemble: **24.920 s MAE**
+- Seeds: `1, 5, 79, 123, 256`
 
-- **Tautomer-consistent paired-view construction**: each molecule retains its original SMRT RT label, while a strict tautomer-standardized view is generated for the same compound under molecular-identity checks.
-- **Topology-aware molecular representation**: atom, bond, and ring-cell information is encoded by a CWN-based cell-complex backbone and summarized as atom-, bond-, and ring-level molecular tokens.
-- **Leakage-free OOF prediction fusion**: five-fold OOF predictions from the dataset-provided and tautomer-standardized views are used to fit a robust Huber stacker without using independent-test labels for model selection, calibration, or stacker fitting.
+The conventional atom-bond GNN baseline obtained **28.252 s MAE**, which is 3.240 s higher than TC-TopoRT seed 5.
+
+### External transfer learning
+
+Across ten external datasets:
+
+- transfer learning achieved lower MAE on **8/10 datasets**;
+- mean MAE improvement: **9.164 s**;
+- median MAE improvement: **3.677 s**.
+
+### Candidate filtering
+
+| Dataset | Reduction | True retained | Top-1 | Top-5 | Top-10 | FN |
+|---|---:|---:|---:|---:|---:|---:|
+| MetaboBase | 69.14% | 93.33% | 55.56% | 82.22% | 88.89% | 3 |
+| RIKEN-PlaSMA | 46.23% | 97.65% | 54.12% | 77.65% | 89.41% | 2 |
 
 ## Repository structure
 
-```text
-.
-├── build_tautomer_strict_csv.py          # strict tautomer-standardized CSV generator
-├── README.md
-└── gwn/
-    ├── train_oof_dualview_stack.py       # main TC-TopoRT training/evaluation entry
-    ├── run_oof_multiseed_5runs.sh        # multi-seed OOF runs
-    ├── data/
-    │   ├── SMRT_train.csv
-    │   └── SMRT_test.csv
-    ├── data_taut_strict_origin_order/
-    │   ├── SMRT_train_tautomer_strict.csv
-    │   ├── SMRT_test_tautomer_strict.csv
-    │   ├── SMRT_train_tautomer_strict_reorder_audit.csv
-    │   └── SMRT_test_tautomer_strict_reorder_audit.csv
-    ├── diagnostics/
-    │   ├── check_dualview_pair_data.py
-    │   ├── reorder_tautomer_csv_to_origin_order.py
-    │   └── make_smrt_oof_paper_figures.py
-    ├── mp/                               # cell-complex data structures and CWN layers
-    └── net/
-        ├── cwn.py
-        ├── cwn_abcort_transformer.py
-        ├── cwn_hypergraph_adapter.py
-        └── topocellrt_cwn_replace.py
-```
-
-The old exploratory scripts, old models, logs, checkpoints, and intermediate results were intentionally removed from the tracked repository. Local archives are ignored by `.gitignore`.
-
-## Environment
-
-The code was developed with a Python/PyTorch Geometric/RDKit environment. The main dependencies are:
-
-```text
-Python 3.10
-PyTorch
-PyTorch Geometric
-RDKit
-NumPy
-Pandas
-scikit-learn
-tqdm
-torch-scatter
-torch-sparse
-torch-cluster
-```
-
-Example environment activation used in experiments:
-
-```bash
-conda activate lrq_q
-```
-
-## Data
-
-The final repository includes the official SMRT split and the paired strict tautomer-standardized view:
-
-```text
-gwn/data/SMRT_train.csv
-gwn/data/SMRT_test.csv
-gwn/data_taut_strict_origin_order/SMRT_train_tautomer_strict.csv
-gwn/data_taut_strict_origin_order/SMRT_test_tautomer_strict.csv
-```
-
-The training pipeline filters molecules using the same rule as the dataset code: `rt > 300.0`, followed by RDKit-valid molecule filtering.
-
-The current paired data check gives:
-
-```text
-Train valid rows: 70182
-Test valid rows : 7798
-Train strict tautomer changed: 37724 / 70182
-Test strict tautomer changed : 4242 / 7798
-```
-
-## Regenerate strict tautomer-standardized data
-
-The strict tautomer-standardization generator uses the repository-internal `gwn/data/` files by default and writes generated outputs to a non-final output directory to avoid overwriting the curated paired data.
-
-```bash
-python build_tautomer_strict_csv.py \
-  --train_csv gwn/data/SMRT_train.csv \
-  --test_csv gwn/data/SMRT_test.csv \
-  --out_dir gwn/data_taut_strict_generated
-```
-
-The generated files should be checked before use.
-
-## Check original/tautomer pairing
-
-Run the pairing diagnostic before training or after regenerating tautomer-standardized data:
-
-```bash
-cd gwn
-
-PYTHONPATH=. python diagnostics/check_dualview_pair_data.py \
-  --origin_train data/SMRT_train.csv \
-  --origin_test data/SMRT_test.csv \
-  --taut_train data_taut_strict_origin_order/SMRT_train_tautomer_strict.csv \
-  --taut_test data_taut_strict_origin_order/SMRT_test_tautomer_strict.csv
-```
-
-A successful check should report zero RT mismatch and pass both TRAIN and TEST pair checks.
-
-## Train TC-TopoRT
-
-Run a single five-fold OOF dual-view stack experiment:
-
-```bash
-cd gwn
-
-PYTHONPATH=. python train_oof_dualview_stack.py \
-  --k 5 \
-  --seed 1 \
-  --epochs 150 \
-  --patience 30 \
-  --batch_size 64 \
-  --eval_batch_size 64 \
-  --num_workers 4 \
-  --lr 1e-4 \
-  --weight_decay 1e-2 \
-  --huber_beta 1.0 \
-  --origin_train_csv data/SMRT_train.csv \
-  --origin_test_csv data/SMRT_test.csv \
-  --taut_train_csv data_taut_strict_origin_order/SMRT_train_tautomer_strict.csv \
-  --taut_test_csv data_taut_strict_origin_order/SMRT_test_tautomer_strict.csv \
-  --origin_train_root smrt_cwn_oof_origin_train \
-  --origin_test_root smrt_cwn_oof_origin_test \
-  --taut_train_root smrt_cwn_oof_taut_train \
-  --taut_test_root smrt_cwn_oof_taut_test \
-  --out_dir results_OOF_DualView_Stack_v1
-```
-
-To run the additional seeds used in the final multi-seed summary:
-
-```bash
-cd gwn
-bash run_oof_multiseed_5runs.sh
-```
-
-The helper script runs seeds `79`, `123`, `256`, and `5`. Seed `1` is usually run separately as `results_OOF_DualView_Stack_v1`.
-
-## Resume cached OOF predictions
-
-If fold-level cached prediction files already exist, the training script can rebuild the OOF/test prediction tables and stacker results without retraining the GNNs:
-
-```bash
-cd gwn
-
-PYTHONPATH=. python train_oof_dualview_stack.py \
-  --resume 1 \
-  --k 5 \
-  --seed 1 \
-  --epochs 150 \
-  --patience 30 \
-  --batch_size 64 \
-  --eval_batch_size 64 \
-  --num_workers 4 \
-  --lr 1e-4 \
-  --weight_decay 1e-2 \
-  --huber_beta 1.0 \
-  --origin_train_csv data/SMRT_train.csv \
-  --origin_test_csv data/SMRT_test.csv \
-  --taut_train_csv data_taut_strict_origin_order/SMRT_train_tautomer_strict.csv \
-  --taut_test_csv data_taut_strict_origin_order/SMRT_test_tautomer_strict.csv \
-  --origin_train_root smrt_cwn_oof_origin_train \
-  --origin_test_root smrt_cwn_oof_origin_test \
-  --taut_train_root smrt_cwn_oof_taut_train \
-  --taut_test_root smrt_cwn_oof_taut_test \
-  --out_dir results_OOF_DualView_Stack_v1
-```
+~~~text
+scripts/
+├── training/    SMRT training entries
+├── data/        paired-view construction and validation
+├── ablation/    structural and atom-bond GNN ablations
+├── transfer/    external transfer and scratch workflows
+├── filtering/   candidate filtering and sensitivity analysis
+└── figures/     public figure-generation entries
 
-For a complete five-fold dual-view run, the resume sanity check should print 10 cached-load messages:
+data/
+├── candidate_filtering/
+└── ablation/
 
-```text
-5 folds × 2 views = 10 [RESUME] messages
-```
+artifacts/
+├── cache/
+├── results/
+└── figures/
+~~~
 
-## Model files
+Generated outputs under `artifacts/` are excluded from Git.
 
-The final model chain is:
+## Installation
 
-```text
-train_oof_dualview_stack.py
-  -> net/topocellrt_cwn_replace.py
-  -> net/cwn_hypergraph_adapter.py
-  -> net/cwn_abcort_transformer.py
-  -> net/cwn.py
-```
+Using Conda:
 
-`TopoCellRTCWNReplace` uses a CWN adapter to obtain three topology-aware tokens per molecule: atom-token, bond-token, and ring-token. These tokens are transformed, pooled, gated, combined with 24-dimensional molecular global context, and finally passed to the RT regression head.
+~~~bash
+conda env create -f environment.yml
+conda activate tc-toport
+~~~
 
-## Final SMRT results
+Using pip:
 
-The five-run TC-TopoRT-S summary was:
+~~~bash
+python -m pip install -r requirements.txt
+~~~
 
-```text
-MAE   : 25.0551 ± 0.0391 s
-MedAE : 11.3168 ± 0.0976 s
-RMSE  : 55.6713 ± 0.1006 s
-R2    : 0.8983 ± 0.0004
-P95   : 86.4581 ± 0.5962 s
-P99   : 282.7597 ± 4.0937 s
->100s : 319.6 ± 5.8 molecules
->200s : 134.2 ± 2.2 molecules
-Bias  : 1.7807 ± 0.1121 s
-```
+PyTorch and PyTorch Geometric may need installation commands compatible with the local CUDA version.
 
-The molecule-wise five-seed ensemble, TC-TopoRT-E, achieved an MAE of `24.920 s` on the retained-compound SMRT test set.
+## Reproduction
 
-The selected final prediction-level stacker was `huber_stack`.
+Run all commands from the repository root.
 
-## Output files
+### 1. Build and validate paired SMRT views
 
-Each run writes files such as:
+~~~bash
+bash scripts/data/rebuild_strict_tautomer_views.sh
+bash scripts/data/validate_smrt_paired_views.sh
+~~~
 
-```text
-results_OOF_DualView_Stack_*/config.json
-results_OOF_DualView_Stack_*/final_metrics.json
-results_OOF_DualView_Stack_*/oof_predictions.csv
-results_OOF_DualView_Stack_*/test_predictions.csv
-results_OOF_DualView_Stack_*/oof_base_predictions.csv
-results_OOF_DualView_Stack_*/test_base_predictions.csv
-```
+Expected validation:
 
-Generated result folders, logs, local archives, and cached graph datasets are ignored by `.gitignore`.
+~~~text
+Train: 70,182
+Test: 7,798
+Train changed: 37,724
+Test changed: 4,242
+Formula preserved: all
+Invalid SMILES: 0
+~~~
 
-## Notes
+### 2. Train TC-TopoRT
 
-- The repository keeps the final TC-TopoRT workflow only.
-- The strict tautomer-standardized view must remain paired with the dataset-provided SMRT view in the original row order and under the same RT label.
-- Do not tune the prediction-level stacker on the independent test set.
-- Use training-set OOF predictions to select stacking and fusion parameters.
+Single seed:
 
-## External all10 transfer-vs-scratch reproduction
+~~~bash
+bash scripts/training/run_smrt_single_seed.sh 5
+~~~
 
-The external transfer-vs-scratch comparison is organized into two lines: transfer learning and training from scratch.
+Five seeds:
 
-### Dataset list
+~~~bash
+bash scripts/training/run_smrt_five_seeds.sh
+~~~
 
-The all10 external dataset list is stored in:
+Outputs are written under `artifacts/results/smrt/`.
 
-    gwn/configs/external_all10_datasets.csv
+### 3. Structural ablations
 
-It combines the six external datasets used for comparison with published transfer-learning references and four additional external datasets:
+~~~bash
+bash scripts/ablation/run_structural_ablation.sh no2cell
+bash scripts/ablation/run_structural_ablation.sh cwn0
+~~~
 
-    FEM_short_73
-    UniToyama_Atlantis_143
-    FEM_long_412
-    Eawag_XBridgeC18_364
-    LIFE_old_194
-    MTBLS87_147
-    LIFE_new_184
-    Cao_HILIC_116
-    IPB_Halle_82
-    FEM_lipids_72
+### 4. Atom-bond GNN baseline
 
-### Transfer-learning line
+~~~bash
+bash scripts/ablation/run_atom_bond_gnn.sh
+~~~
 
-Paper-facing wrapper:
+### 5. External transfer and scratch experiments
 
-    gwn/experiments_transfer_effectiveness/external_transfer_all10.py
+~~~bash
+python scripts/transfer/train_scratch_all10.py
+python scripts/transfer/train_transfer_all10.py
+~~~
 
-Shell entry point:
+The combined comparison table is written to:
 
-    cd gwn
-    bash experiments_transfer_effectiveness/run_transfer_all10_datasets.sh
+~~~text
+artifacts/results/external_transfer/Table_8_transfer_learning_effectiveness.csv
+~~~
 
-This line uses the TC-TopoRT transfer-learning protocol with fixed raw AutoSelect aggregation.
+### 6. Candidate filtering
 
-### From-scratch line
+~~~bash
+python scripts/filtering/run_candidate_filtering.py
+python scripts/filtering/run_filtering_sensitivity.py
+~~~
 
-Paper-facing wrapper:
+### 7. Generate figures
 
-    gwn/experiments_transfer_effectiveness/external_scratch_all10.py
+~~~bash
+python scripts/figures/make_candidate_filtering_figure.py
+python scripts/figures/make_transfer_figure.py
+python scripts/figures/make_ablation_figure.py
+python scripts/figures/make_smrt_figures.py
+~~~
 
-Shell entry point:
+The SMRT figure entry expects:
 
-    cd gwn
-    bash experiments_transfer_effectiveness/run_scratch_all10_datasets.sh
+~~~text
+artifacts/results/smrt/seed5/test_predictions.csv
+~~~
 
-This line uses random initialization and scratch training on the same ten external datasets.
+A different result directory can be supplied with:
 
-### Existing all10 result summary and figure
+~~~bash
+python scripts/figures/make_smrt_figures.py \
+  --result_dir artifacts/results/smrt/<result-directory>
+~~~
 
-The existing all10 transfer-vs-scratch MAE values are summarized and plotted by:
+## Leakage control
 
-    cd gwn
-    python experiments_transfer_effectiveness/make_external_all10_transfer_vs_scratch_figure.py
+The paired molecular views share identical labels and splits. Prediction-level fusion is fitted from out-of-fold training predictions. Independent test labels are not used for model selection, stacker fitting, calibration, or filtering-parameter optimization.
 
-This script does not train models. It formats existing all10 scratch and transfer-learning MAE values into CSV, Markdown, TXT summaries, and a bar figure.
+The candidate-filtering comparisons use consistent candidate lists, query sets, experimental RT values, original MS-FINDER ranks, filtering rules, reranking definitions, and evaluation metrics.
 
-Output directory:
+## Data policy
 
-    gwn/experiments_transfer_effectiveness/all10_transfer_vs_scratch_final/
+The public candidate-filtering CSV files and the compact ablation source table are included under `data/`.
 
-### Relationship to core model code
-
-The external all10 wrappers do not modify the core TC-TopoRT model implementation.
-
-Core model code remains under:
-
-    gwn/mp/
-    gwn/net/
-    gwn/train_oof_dualview_stack.py
+Large caches, checkpoints, weights, logs, generated predictions, tables, and figures remain under `artifacts/` and are not committed.

@@ -1,0 +1,6 @@
+variant,mae,mae_std,group,note,delta_mae_vs_full
+Original view only,25.278126353680427,0.054085654806677194,single-view/fusion,five-seed mean of single-view 5-fold predictions,0.2659182415276362
+Tautomer view only,25.217208544242116,0.07027721900020427,single-view/fusion,five-seed mean of single-view 5-fold predictions,0.2050004320893244
+w/o ring 2-cells,25.10164261863183,0.0,structural,"seed5, max ring size set to 2",0.08943450647903717
+Full TC-TopoRT,25.01220811215279,0.0,full,seed5 final OOF-stacked model,0.0
+w/o CWN,39.64532848497867,0.0,structural,"seed5, CWN layers set to 0",14.633120372825879

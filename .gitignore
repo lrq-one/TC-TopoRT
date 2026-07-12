@@ -68,3 +68,23 @@ __pycache__/
 # local analysis outputs
 *.tmp
 *.bak
+
+# Submission public-data whitelist
+
+# Generated experiment outputs
+artifacts/
+
+# Public candidate-filtering inputs
+!data/candidate_filtering/
+!data/candidate_filtering/*.csv
+
+# Public ablation source table
+!data/ablation/*.csv
+
+# Public reproducibility source tables
+!data/
+!data/ablation/
+!data/ablation/source_ablation_delta_final.csv
+
+# Public environment specification
+!requirements.txt
