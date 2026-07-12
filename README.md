@@ -1,21 +1,21 @@
-# TCDV-TopoRT
+# TC-TopoRT
 
-TCDV-TopoRT is a topology-aware dual-view graph neural network pipeline for small-molecule retention time (RT) prediction on the SMRT dataset.
+TC-TopoRT is a tautomer-consistent and topology-aware framework for small-molecule retention time (RT) prediction and RT-assisted metabolite annotation.
 
-The current repository is organized around the final **TCDV-TopoRT** route, not the earlier legacy TopoCellRT experiments. The main idea is to represent the same SMRT compound with two paired molecular views:
+The current repository contains the final **TC-TopoRT** implementation. For each SMRT compound, the framework constructs two paired molecular views:
 
-1. the official/original SMILES graph;
-2. a strict tautomer-canonical graph generated without changing the RT label or the train/test split.
+1. the dataset-provided SMILES graph;
+2. a strict tautomer-standardized graph generated through conservative tautomer canonicalization under identity-preserving checks, without changing the experimental RT label or the original train/test split.
 
-Each view is encoded by the same CWN-based topology-aware model. The out-of-fold (OOF) predictions from the two views are then combined by a prediction-level stacker selected only on OOF validation predictions.
+Each view is encoded by a CWN-based topology-aware model that learns atom-, bond-, and ring-level molecular representations. The out-of-fold (OOF) predictions from the two views are subsequently integrated through a prediction-level Huber stacker fitted only on training-set OOF predictions.
 
 ## Key idea
 
-TCDV-TopoRT uses three design choices.
+TC-TopoRT combines three principal design components:
 
-- **Dual-view molecular construction**: each molecule keeps the original SMRT RT label, while an additional strict tautomer-canonical view is generated for the same compound.
-- **Topology-aware molecular representation**: atom, bond, and ring-cell information is encoded by a CWN-style cell-complex backbone and summarized as atom/bond/ring tokens.
-- **OOF prediction-level stacking**: 5-fold OOF predictions from the original and tautomer views are used to train a robust Huber stacker, avoiding test-set tuning.
+- **Tautomer-consistent paired-view construction**: each molecule retains its original SMRT RT label, while a strict tautomer-standardized view is generated for the same compound under molecular-identity checks.
+- **Topology-aware molecular representation**: atom, bond, and ring-cell information is encoded by a CWN-based cell-complex backbone and summarized as atom-, bond-, and ring-level molecular tokens.
+- **Leakage-free OOF prediction fusion**: five-fold OOF predictions from the dataset-provided and tautomer-standardized views are used to fit a robust Huber stacker without using independent-test labels for model selection, calibration, or stacker fitting.
 
 ## Repository structure
 
