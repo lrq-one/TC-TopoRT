@@ -1,238 +1,267 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
 from pathlib import Path
-import pandas as pd
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
-INPUT_CSV = ROOT / "data" / "ablation" / "source_ablation_delta_final.csv"
+DUALVIEW_DEFAULT = (
+    ROOT
+    / "artifacts"
+    / "results"
+    / "paper_tables"
+    / "ablation"
+    / "dualview_fusion_ablation_summary.csv"
+)
+STRUCTURAL_DEFAULT = (
+    ROOT
+    / "artifacts"
+    / "results"
+    / "paper_tables"
+    / "ablation"
+    / "structural_ablation_seed5.csv"
+)
+OUT_DIR_DEFAULT = ROOT / "artifacts" / "figures" / "ablation"
 
-OUT_DIR = ROOT / "artifacts" / "figures" / "ablation"
-OUT_PNG = OUT_DIR / "fig_ablation_delta_mae_final.png"
-OUT_PDF = OUT_DIR / "fig_ablation_delta_mae_final.pdf"
 
-# ------------------------------------------------------------
-# visual style: keep close to your old blue-toned figure
-# ------------------------------------------------------------
-COLOR_MAP = {
-    "Original view only": "#1f78b4",
-    "Tautomer view only": "#1f78b4",
-    "w/o ring 2-cells": "#1f78b4",
-    "Full TC-TopoRT": "#1f78b4",
-    "Full model": "#1f78b4",
-    "w/o CWN": "#1f78b4",
-}
-
-EDGE = "#1c4e6e"
-GRID = "#d9d9d9"
-
-DISPLAY_MAP = {
-    "Original view only": "Original",
-    "Tautomer view only": "Tautomer",
-    "w/o ring 2-cells": "w/o ring\n2-cells",
-    "Full TC-TopoRT": "Full",
-    "Full model": "Full",
-    "w/o CWN": "w/o CWN",
-}
-
-LEFT_ORDER = [
+PANEL_A_ORDER = [
     "Original view only",
     "Tautomer view only",
-    "w/o ring 2-cells",
+    "Same-seed paired mean fusion",
+    "OOF Huber stack",
+]
+
+PANEL_A_LABELS = {
+    "Original view only": "Original\nview only",
+    "Tautomer view only": "Strict tautomer\nview only",
+    "Same-seed paired mean fusion": "Same-seed\npaired mean\nfusion",
+    "OOF Huber stack": "OOF Huber\nstack",
+}
+
+PANEL_B_ORDER = [
     "Full TC-TopoRT",
+    "w/o explicit ring 2-cells",
+    "Conventional atom-bond GNN",
+    "w/o CWN message passing",
 ]
 
-RIGHT_ORDER = [
-    "Original view only",
-    "Tautomer view only",
-    "w/o ring 2-cells",
-    "w/o CWN",
-]
+PANEL_B_LABELS = {
+    "Full TC-TopoRT": "Full TC-TopoRT",
+    "w/o explicit ring 2-cells": "w/o explicit\nring 2-cells",
+    "Conventional atom-bond GNN": "Atom-bond GNN\n(same protocol)",
+    "w/o CWN message passing": "w/o CWN\nmessage passing",
+}
 
 
-def load_df():
-    p = INPUT_CSV
-    if not p.is_file():
+def resolve_path(value: str | Path) -> Path:
+    path = Path(value).expanduser()
+    return path if path.is_absolute() else ROOT / path
+
+
+def require_unique_row(frame: pd.DataFrame, column: str, value: str) -> pd.Series:
+    rows = frame[frame[column].astype(str).eq(value)]
+    if len(rows) != 1:
+        raise RuntimeError(
+            f"Expected exactly one row where {column}={value!r}; found {len(rows)}"
+        )
+    return rows.iloc[0]
+
+
+def load_panel_a(path: Path) -> tuple[list[float], list[float]]:
+    if not path.is_file():
         raise FileNotFoundError(
-            f"Public ablation source table was not found: {p}"
+            f"Dual-view ablation summary not found: {path}\n"
+            "Run: python scripts/analysis/build_dualview_ablation.py"
         )
 
-    df = pd.read_csv(p)
+    frame = pd.read_csv(path)
+    required = {"method", "mae_mean", "mae_sd"}
+    missing = required - set(frame.columns)
+    if missing:
+        raise RuntimeError(f"{path} is missing columns: {sorted(missing)}")
 
-    if "variant" not in df.columns or "mae" not in df.columns:
-        raise RuntimeError(f"Unexpected columns in {p}: {df.columns.tolist()}")
+    values: list[float] = []
+    errors: list[float] = []
+    for method in PANEL_A_ORDER:
+        row = require_unique_row(frame, "method", method)
+        values.append(float(row["mae_mean"]))
+        errors.append(float(row["mae_sd"]))
 
-    # normalize one naming variant
-    df["variant"] = df["variant"].replace({"Full model": "Full TC-TopoRT"})
-    if "mae_std" not in df.columns:
-        df["mae_std"] = 0.0
-
-    return p, df
-
-
-def get_row(df, name):
-    sub = df[df["variant"] == name]
-    if len(sub) == 0:
-        raise KeyError(f"Missing variant: {name}")
-    return sub.iloc[0]
+    return values, errors
 
 
-def main():
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    in_path, df = load_df()
+def load_panel_b(path: Path) -> tuple[list[float], list[float]]:
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Structural ablation summary not found: {path}\n"
+            "Run: python scripts/analysis/collect_structural_ablation.py"
+        )
 
-    full_mae = float(get_row(df, "Full TC-TopoRT")["mae"])
+    frame = pd.read_csv(path)
+    required = {"variant", "mae", "delta_mae_vs_full"}
+    missing = required - set(frame.columns)
+    if missing:
+        raise RuntimeError(f"{path} is missing columns: {sorted(missing)}")
 
-    left_vals, left_std, left_labels, left_colors = [], [], [], []
-    for name in LEFT_ORDER:
-        row = get_row(df, name)
-        left_vals.append(float(row["mae"]))
-        left_std.append(float(row.get("mae_std", 0.0)))
-        left_labels.append(DISPLAY_MAP[name])
-        left_colors.append(COLOR_MAP[name])
+    values: list[float] = []
+    deltas: list[float] = []
+    for variant in PANEL_B_ORDER:
+        row = require_unique_row(frame, "variant", variant)
+        values.append(float(row["mae"]))
+        deltas.append(float(row["delta_mae_vs_full"]))
 
-    right_vals, right_labels, right_colors = [], [], []
-    for name in RIGHT_ORDER:
-        row = get_row(df, name)
-        delta = float(row["mae"]) - full_mae
-        right_vals.append(delta)
-        right_labels.append(DISPLAY_MAP[name])
-        right_colors.append(COLOR_MAP.get(name, "#1f78b4"))
+    return values, deltas
 
-    plt.close("all")
-    fig = plt.figure(figsize=(7.0, 3.15))
-    gs = fig.add_gridspec(1, 2, width_ratios=[1.0, 1.0], wspace=0.33)
 
-    # ============================================================
-    # Panel A
-    # ============================================================
-    ax1 = fig.add_subplot(gs[0, 0])
-    x1 = np.arange(len(left_vals))
-    bars1 = ax1.bar(
-        x1,
-        left_vals,
-        yerr=left_std,
-        color=left_colors,
-        edgecolor=EDGE,
-        linewidth=0.8,
-        capsize=2.5,
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Generate the manuscript Figure 5 ablation plot from the public "
+            "dual-view and structural-ablation summary tables."
+        )
+    )
+    parser.add_argument(
+        "--dualview_csv",
+        default=str(DUALVIEW_DEFAULT.relative_to(ROOT)),
+    )
+    parser.add_argument(
+        "--structural_csv",
+        default=str(STRUCTURAL_DEFAULT.relative_to(ROOT)),
+    )
+    parser.add_argument(
+        "--out_dir",
+        default=str(OUT_DIR_DEFAULT.relative_to(ROOT)),
+    )
+    args = parser.parse_args()
+
+    dualview_csv = resolve_path(args.dualview_csv)
+    structural_csv = resolve_path(args.structural_csv)
+    out_dir = resolve_path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    panel_a_values, panel_a_errors = load_panel_a(dualview_csv)
+    panel_b_values, panel_b_deltas = load_panel_b(structural_csv)
+
+    plt.rcParams.update(
+        {
+            "font.family": "DejaVu Sans",
+            "font.size": 7.4,
+            "axes.titlesize": 8.3,
+            "axes.labelsize": 7.8,
+            "xtick.labelsize": 6.8,
+            "ytick.labelsize": 6.9,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+        }
+    )
+
+    colors_a = ["#8EA6C6", "#5FB3AC", "#8A73BE", "#6253AE"]
+    colors_b = ["#6A55B5", "#9A87CB", "#6F9CC4", "#D99552"]
+
+    fig = plt.figure(figsize=(7.35, 3.45))
+    gs = fig.add_gridspec(
+        1,
+        2,
+        width_ratios=[1.08, 1.0],
+        left=0.085,
+        right=0.985,
+        bottom=0.23,
+        top=0.88,
+        wspace=0.31,
+    )
+
+    # Panel A: dual-view and fusion ablation.
+    ax_a = fig.add_subplot(gs[0, 0])
+    x = np.arange(len(PANEL_A_ORDER))
+    bars_a = ax_a.bar(
+        x,
+        panel_a_values,
+        yerr=panel_a_errors,
+        capsize=3,
         width=0.62,
+        color=colors_a,
+        edgecolor="#555555",
+        linewidth=0.6,
         zorder=3,
     )
 
-    baseline = full_mae
-    ymin = min(min(left_vals), baseline) - 0.06
-    ymax = max(left_vals) + max(left_std + [0]) + 0.06
+    ax_a.set_title("A   Dual-view and fusion ablation", loc="left", fontweight="bold")
+    ax_a.set_ylabel("MAE (s)")
+    ax_a.set_xticks(x)
+    ax_a.set_xticklabels([PANEL_A_LABELS[name] for name in PANEL_A_ORDER])
+    ax_a.set_ylim(24.90, 25.40)
+    ax_a.grid(axis="y", linestyle="--", linewidth=0.4, alpha=0.35, zorder=0)
+    ax_a.set_axisbelow(True)
 
-    ax1.axhline(
-        baseline,
-        color="#8ebad3",
-        linestyle="--",
-        linewidth=1.0,
-        zorder=1,
-    )
-
-    ax1.set_ylim(ymin, ymax)
-    ax1.set_xticks(x1)
-    ax1.set_xticklabels(left_labels, fontsize=7.2)
-    ax1.set_ylabel("MAE (s)", fontsize=7.8)
-    ax1.set_title("(A) Zoomed comparison near Full model", fontsize=7.8, pad=4)
-
-    ax1.grid(axis="y", linestyle="--", linewidth=0.5, color=GRID, alpha=0.7, zorder=0)
-    ax1.set_axisbelow(True)
-
-    for rect, val in zip(bars1, left_vals):
-        ax1.text(
-            rect.get_x() + rect.get_width() / 2,
-            rect.get_height() + 0.008,
-            f"{val:.3f}" if val < 25.1 else f"{val:.3f}".rstrip("0").rstrip("."),
+    for bar, value, error in zip(bars_a, panel_a_values, panel_a_errors):
+        ax_a.text(
+            bar.get_x() + bar.get_width() / 2,
+            value + error + 0.012,
+            f"{value:.3f}\n±{error:.3f}",
             ha="center",
             va="bottom",
-            fontsize=6.9,
-            color="#222222",
+            fontsize=6.5,
+            linespacing=0.9,
         )
 
-    # ============================================================
-    # Panel B
-    # ============================================================
-    ax2 = fig.add_subplot(gs[0, 1])
-    y2 = np.arange(len(right_vals))
-
-    bars2 = ax2.barh(
-        y2,
-        right_vals,
-        color=right_colors,
-        edgecolor=EDGE,
-        linewidth=0.8,
-        height=0.58,
+    # Panel B: structural ablation and atom-bond control.
+    ax_b = fig.add_subplot(gs[0, 1])
+    y = np.arange(len(PANEL_B_ORDER))
+    bars_b = ax_b.barh(
+        y,
+        panel_b_values,
+        height=0.62,
+        color=colors_b,
+        edgecolor="#555555",
+        linewidth=0.6,
         zorder=3,
     )
 
-    ax2.set_yticks(y2)
-    ax2.set_yticklabels(right_labels, fontsize=7.2)
-    ax2.invert_yaxis()
-    ax2.set_xlabel(r"$\Delta$MAE vs Full (s)", fontsize=7.8)
-    ax2.set_title("(B) Error increase after removing components", fontsize=7.8, pad=4)
+    ax_b.set_title("B   Structural ablation", loc="left", fontweight="bold")
+    ax_b.set_xlabel("MAE (s)")
+    ax_b.set_yticks(y)
+    ax_b.set_yticklabels([PANEL_B_LABELS[name] for name in PANEL_B_ORDER])
+    ax_b.invert_yaxis()
+    ax_b.set_xlim(0, 43.5)
+    ax_b.grid(axis="x", linestyle="--", linewidth=0.4, alpha=0.35, zorder=0)
+    ax_b.set_axisbelow(True)
 
-    xmax = max(right_vals) + 3.6
-    ax2.set_xlim(0, xmax)
-    ax2.set_xticks(np.arange(0, np.ceil(xmax) + 0.1, 2))
-    ax2.grid(axis="x", linestyle="--", linewidth=0.5, color=GRID, alpha=0.7, zorder=0)
-    ax2.set_axisbelow(True)
+    for index, (bar, value, delta) in enumerate(
+        zip(bars_b, panel_b_values, panel_b_deltas)
+    ):
+        label = f"{value:.3f}"
+        if index > 0:
+            label += f"  (Δ=+{delta:.3f})"
+        ax_b.text(
+            value + 0.35,
+            bar.get_y() + bar.get_height() / 2,
+            label,
+            ha="left",
+            va="center",
+            fontsize=6.7,
+        )
 
-    # important: label stays INSIDE plotting area with visible margin
-    right_margin = 1.8
-    outside_offset = 0.14
-    inside_offset = 0.22
+    for axis in (ax_a, ax_b):
+        axis.spines["top"].set_visible(False)
+        axis.spines["right"].set_visible(False)
+        axis.tick_params(width=0.7, length=3)
 
-    for rect, val in zip(bars2, right_vals):
-        y = rect.get_y() + rect.get_height() / 2
-        txt = f"+{val:.3f}"
-
-        proposed = val + outside_offset
-        if proposed <= xmax - right_margin:
-            # normal case: put outside bar, but still inside frame
-            ax2.text(
-                proposed,
-                y,
-                txt,
-                ha="left",
-                va="center",
-                fontsize=6.9,
-                color="#222222",
-                clip_on=True,
-            )
-        else:
-            # if too close to border, place slightly inside the bar end
-            ax2.text(
-                max(val - inside_offset, 0.05),
-                y,
-                txt,
-                ha="right",
-                va="center",
-                fontsize=6.9,
-                color="white",
-                bbox=dict(facecolor=COLOR_MAP.get("w/o CWN", "#1f78b4"), edgecolor="#1c567a", pad=0.18),
-            )
-
-    # spine / ticks
-    for ax in (ax1, ax2):
-        for spine in ax.spines.values():
-            spine.set_linewidth(0.8)
-            spine.set_color("#444444")
-        ax.tick_params(axis="both", labelsize=7.0, length=3.0, width=0.8)
-
-    fig.subplots_adjust(left=0.08, right=0.985, top=0.90, bottom=0.18)
-
-    fig.savefig(OUT_PDF, bbox_inches="tight", pad_inches=0.02)
-    fig.savefig(OUT_PNG, dpi=600, bbox_inches="tight", pad_inches=0.02)
+    out_pdf = out_dir / "fig5_ablation_analysis.pdf"
+    out_png = out_dir / "fig5_ablation_analysis.png"
+    fig.savefig(out_pdf, bbox_inches="tight", pad_inches=0.03)
+    fig.savefig(out_png, dpi=600, bbox_inches="tight", pad_inches=0.03)
     plt.close(fig)
 
-    print("[INPUT]", in_path.relative_to(ROOT))
-    print("[SAVE]", OUT_PDF.relative_to(ROOT))
-    print("[SAVE]", OUT_PNG.relative_to(ROOT))
-    print()
-    print(df[["variant", "mae", "mae_std"]].to_string(index=False))
+    print("[INPUT]", dualview_csv.relative_to(ROOT))
+    print("[INPUT]", structural_csv.relative_to(ROOT))
+    print("[SAVE]", out_pdf.relative_to(ROOT))
+    print("[SAVE]", out_png.relative_to(ROOT))
 
 
 if __name__ == "__main__":
