@@ -1,0 +1,25 @@
+experiment: smrt_main
+seeds: [1, 5, 79, 123, 256]
+folds: 5
+epochs: 150
+early_stopping_patience: 30
+batch_size: 64
+eval_batch_size: 64
+num_workers: 4
+optimizer: AdamW
+learning_rate: 1.0e-4
+weight_decay: 1.0e-2
+loss: smooth_l1
+huber_beta: 1.0
+max_ring_size: 6
+cwn_layers: 6
+cwn_hidden: 256
+stacker: huber_stack
+stacker_huber_alpha: 1.0e-4
+stacker_epsilon: 1.35
+stacker_fit_data: training_oof_predictions_only
+train_csv: gwn/data/SMRT_train.csv
+test_csv: gwn/data/SMRT_test.csv
+tautomer_train_csv: gwn/data_taut_strict_origin_order/SMRT_train_tautomer_strict.csv
+tautomer_test_csv: gwn/data_taut_strict_origin_order/SMRT_test_tautomer_strict.csv
+output_root: artifacts/results/smrt
