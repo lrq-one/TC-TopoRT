@@ -1,0 +1,24 @@
+experiment: external_transfer_vs_scratch
+dataset_manifest: configs/external_datasets.csv
+cv_folds: 10
+cv_seed: 1
+epochs: 150
+batch_size: 8
+eval_batch_size: 64
+optimizer: AdamW
+learning_rate: 1.0e-4
+weight_decay: 1.0e-2
+loss: smooth_l1
+huber_beta: 1.0
+max_ring_size: 6
+transfer_run_key: seed5
+source_folds: [0, 1, 2, 3, 4]
+freeze_mode: rt_head_full
+reset_output_layer: true
+scratch_freeze_mode: all
+minimum_dataset_size: 30
+processed_meta_csv: artifacts/data/external/external_predret10_stage4_meta.csv
+processed_origin_csv: artifacts/data/external/temp_external_predret10_origin.csv
+processed_tautomer_csv: artifacts/data/external/temp_external_predret10_taut.csv
+smrt_runs_root: artifacts/results/smrt
+output_root: artifacts/results/external_transfer
