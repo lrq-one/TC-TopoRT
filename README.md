@@ -15,7 +15,7 @@ TC-TopoRT combines:
 - external transfer-learning evaluation;
 - guarded RT filtering and soft reranking of MS-FINDER candidates.
 
-Ring 2-cells are constructed from a NetworkX minimum cycle basis of each molecular graph. Cycles of sizes 3 through `max_ring_size` are retained; the paper configuration uses `max_ring_size = 6`.
+Ring 2-cells are constructed from a NetworkX minimum cycle basis. Cycles of sizes 3 through `max_ring_size` are retained; the paper configuration uses `max_ring_size = 6`.
 
 ## Reported results
 
@@ -53,7 +53,8 @@ Across ten external chromatographic datasets, transfer learning reduced MAE on *
 │   └── external_datasets.csv
 ├── data/
 │   ├── ablation/
-│   └── candidate_filtering/
+│   ├── candidate_filtering/
+│   └── external/
 ├── gwn/
 │   ├── train_oof_dualview_stack.py
 │   ├── mp/                         # cell-complex data structures and CWN layers
@@ -71,7 +72,7 @@ Across ten external chromatographic datasets, transfer learning reduced MAE on *
     └── tests/
 ```
 
-All generated caches, checkpoints, predictions, metrics, logs, tables, and figures are written under `artifacts/`, which is excluded from Git.
+Generated caches, checkpoints, predictions, metrics, logs, tables, and figures are written under `artifacts/`, which is excluded from Git.
 
 ## Installation
 
@@ -153,31 +154,24 @@ The ten external systems used in the transfer-versus-scratch analysis are listed
 configs/external_datasets.csv
 ```
 
-The six systems used for direct comparison with literature transfer-learning results are:
+The six systems used for direct comparison with literature transfer-learning results are Eawag-XBridgeC18, FEM-lipids, FEM-long, IPB-Halle, LIFE-new, and LIFE-old. The broader ten-system transfer-versus-scratch analysis additionally includes FEM-short, UniToyama-Atlantis, MTBLS87, and Cao-HILIC.
 
-- Eawag-XBridgeC18;
-- FEM-lipids;
-- FEM-long;
-- IPB-Halle;
-- LIFE-new;
-- LIFE-old.
+**Processed external inputs included in this repository**
 
-The broader ten-system transfer-versus-scratch analysis additionally includes FEM-short, UniToyama-Atlantis, MTBLS87, and Cao-HILIC.
+```text
+data/external/external_predret10_stage4_meta.csv
+data/external/temp_external_predret10_origin.csv
+data/external/temp_external_predret10_taut.csv
+```
 
-The repository does not redistribute a complete PredRet database export. A standardized combined CSV containing dataset identifier, SMILES, and experimental RT can be converted into the three tables consumed by the transfer scripts:
+These three aligned tables contain **1,787 records from 10 external chromatographic systems**. The metadata table stores the dataset identifier, experimental RT, dataset-provided molecular view, strict tautomer-canonical view, and audit fields. The two graph-construction tables provide the original and strict-tautomer views in the same row order used by the external training workflows.
+
+These files are processed inputs for reproducing the reported external experiments; they are not a redistribution of the complete PredRet database. The optional utility below can reconstruct the same input format from a standardized combined PredRet export:
 
 ```bash
 python scripts/data/prepare_external_predret.py \
   --input_csv /path/to/combined_predret.csv \
   --out_dir artifacts/data/external
-```
-
-Generated files:
-
-```text
-artifacts/data/external/external_predret10_stage4_meta.csv
-artifacts/data/external/temp_external_predret10_origin.csv
-artifacts/data/external/temp_external_predret10_taut.csv
 ```
 
 The graph-construction CSVs contain a dummy RT above 300 s because the shared `SMRTComplexDataset` loader applies the SMRT retained-compound filter. Actual external RT values remain in the metadata table and replace the dummy targets during external training.
@@ -226,7 +220,7 @@ data/candidate_filtering/metabobase_rank_guard_soft_grid.csv
 data/candidate_filtering/riken_rank_guard_soft_grid.csv
 ```
 
-These are compact, precomputed parameter-grid result tables retained for immediate verification and plotting of the four-parameter sensitivity audit. The candidate-level CSVs remain the primary processed records for the filtering results.
+These compact, precomputed parameter-grid tables are retained for immediate verification and plotting of the four-parameter sensitivity audit. The candidate-level CSVs remain the primary processed records for the filtering results.
 
 # Reproducibility map
 
@@ -269,15 +263,6 @@ bash scripts/training/run_smrt_five_seeds.sh
 python scripts/analysis/summarize_smrt_results.py
 ```
 
-Generated paper-facing outputs:
-
-```text
-artifacts/results/paper_tables/smrt/smrt_per_seed_metrics.csv
-artifacts/results/paper_tables/smrt/smrt_single_seed_mean_sd.csv
-artifacts/results/paper_tables/smrt/smrt_five_seed_ensemble_metrics.csv
-artifacts/results/paper_tables/smrt/smrt_five_seed_ensemble_predictions.csv
-```
-
 Headline checks:
 
 - mean single-run MAE: approximately 25.055 s;
@@ -291,41 +276,14 @@ Headline checks:
 python scripts/analysis/build_dualview_ablation.py
 ```
 
-Inputs:
-
-```text
-artifacts/results/smrt/seed*/test_base_predictions.csv
-artifacts/results/smrt/seed*/test_predictions.csv
-artifacts/results/smrt/seed*/final_metrics.json
-```
-
-Outputs:
-
-```text
-artifacts/results/paper_tables/ablation/dualview_fusion_ablation_by_seed.csv
-artifacts/results/paper_tables/ablation/dualview_fusion_ablation_summary.csv
-```
-
-This regenerates the original-view, strict-tautomer-view, paired-mean, and OOF-Huber comparison.
+This regenerates the original-view, strict-tautomer-view, paired-mean, and OOF-Huber comparison from the formal SMRT prediction files.
 
 ## 4. Structural ablations and atom-bond GNN control
-
-Train the structural variants:
 
 ```bash
 bash scripts/ablation/run_structural_ablation.sh no2cell
 bash scripts/ablation/run_structural_ablation.sh cwn0
-```
-
-Train the conventional atom-bond GNN under the paired-view OOF protocol:
-
-```bash
 bash scripts/ablation/run_atom_bond_gnn.sh
-```
-
-Collect the comparison:
-
-```bash
 python scripts/analysis/collect_structural_ablation.py
 ```
 
@@ -338,38 +296,35 @@ Expected headline MAEs:
 | Conventional atom-bond GNN | about 28.252 |
 | Without CWN message passing | about 39.645 |
 
-Generated table:
-
-```text
-artifacts/results/paper_tables/ablation/structural_ablation_seed5.csv
-```
-
 ## 5. External transfer learning and scratch comparison
 
-Prepare the external PredRet inputs:
+The processed external inputs are already included under `data/external/`.
+
+Validate their alignment before training:
 
 ```bash
-python scripts/data/prepare_external_predret.py \
-  --input_csv /path/to/combined_predret.csv \
-  --out_dir artifacts/data/external
+python scripts/data/validate_external_predret_inputs.py \
+  --meta_csv data/external/external_predret10_stage4_meta.csv \
+  --origin_csv data/external/temp_external_predret10_origin.csv \
+  --taut_csv data/external/temp_external_predret10_taut.csv
 ```
 
 Train from scratch:
 
 ```bash
 python scripts/transfer/train_scratch_all10.py \
-  --stage4_meta_csv artifacts/data/external/external_predret10_stage4_meta.csv \
-  --origin_csv artifacts/data/external/temp_external_predret10_origin.csv \
-  --taut_csv artifacts/data/external/temp_external_predret10_taut.csv
+  --stage4_meta_csv data/external/external_predret10_stage4_meta.csv \
+  --origin_csv data/external/temp_external_predret10_origin.csv \
+  --taut_csv data/external/temp_external_predret10_taut.csv
 ```
 
 Run SMRT-pretrained transfer learning after the SMRT source-fold checkpoints are available:
 
 ```bash
 python scripts/transfer/train_transfer_all10.py \
-  --stage4_meta_csv artifacts/data/external/external_predret10_stage4_meta.csv \
-  --origin_csv artifacts/data/external/temp_external_predret10_origin.csv \
-  --taut_csv artifacts/data/external/temp_external_predret10_taut.csv \
+  --stage4_meta_csv data/external/external_predret10_stage4_meta.csv \
+  --origin_csv data/external/temp_external_predret10_origin.csv \
+  --taut_csv data/external/temp_external_predret10_taut.csv \
   --smrt_runs_root artifacts/results/smrt
 ```
 
@@ -392,20 +347,12 @@ Run the fixed paper operating points:
 python scripts/filtering/run_candidate_filtering.py
 ```
 
-Generated outputs are written under:
-
-```text
-artifacts/results/candidate_filtering/
-```
-
 Expected checks:
 
 | Dataset | Initial | Retained | Reduction | True retained | Top-1 | Top-5 | Top-10 | FN |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | MetaboBase | 3,023 | 933 | 69.14% | 93.33% | 55.56% | 82.22% | 88.89% | 3 |
 | RIKEN-PlaSMA | 5,044 | 2,712 | 46.23% | 97.65% | 54.12% | 77.65% | 89.41% | 2 |
-
-The script validates these values before reporting successful reproduction.
 
 ## 7. Candidate-filtering sensitivity
 
@@ -444,7 +391,7 @@ The following are generated locally and intentionally excluded from Git:
 - external transfer intermediate predictions;
 - historical experiment directories.
 
-They can be regenerated from the code, configurations, and data sources described above.
+They can be regenerated from the code, configurations, and processed inputs described above.
 
 ## License
 
