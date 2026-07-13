@@ -69,7 +69,7 @@ data/external/temp_external_predret10_taut.csv
 
 The three files contain 1,787 aligned records from ten chromatographic systems. Dataset names and settings are listed in `configs/external_datasets.csv`.
 
-Source: Stanstrup et al., *Analytical Chemistry* (2015), [DOI](https://doi.org/10.1021/acs.analchem.5b02287).
+Source: Stanstrup et al., *Analytical Chemistry* (2015), [official publication record](https://doi.org/10.1021/acs.analchem.5b02287).
 
 ### Candidate filtering
 
@@ -84,8 +84,9 @@ The corresponding parameter-sensitivity grids are also provided in `data/candida
 
 Sources:
 
-- MetaboBase: Lei et al., *Analytical Chemistry* (2015), [DOI](https://doi.org/10.1021/acs.analchem.5b01559)
-- RIKEN-PlaSMA / MassBank: Tsugawa et al., *Nature Methods* (2019), [article](https://www.nature.com/articles/s41592-019-0358-2)
+- MetaboBase: Lei et al., *Analytical Chemistry* (2015), [official publication record](https://doi.org/10.1021/acs.analchem.5b01559)
+- RIKEN-PlaSMA: [RIKEN PRIMe](http://prime.psc.riken.jp/), [Metabolomics Workbench data DOI](https://doi.org/10.21228/M8XM40), and [publication](https://www.nature.com/articles/s41592-019-0358-2)
+- MassBank: [official database](https://massbank.eu/MassBank/)
 
 ## Validation
 
