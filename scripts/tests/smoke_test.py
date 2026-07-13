@@ -67,7 +67,9 @@ def main() -> None:
         if len(dataset) != args.n:
             raise RuntimeError(f"Dataset length mismatch: expected {args.n}, got {len(dataset)}")
 
-        batch = ComplexBatch.from_complex_list([dataset[index] for index in range(len(dataset))])
+        batch = ComplexBatch.from_complex_list(
+            [dataset[index] for index in range(len(dataset))]
+        )
         model = TopoCellRTCWNReplace(
             emb_dim=256,
             cwn_layers=1,
@@ -78,6 +80,8 @@ def main() -> None:
         model.eval()
         with torch.no_grad():
             output = model(batch)
+        if isinstance(output, tuple):
+            output = output[0]
 
         output = output.detach().cpu().numpy().reshape(-1)
         if output.shape != (args.n,):
