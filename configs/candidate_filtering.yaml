@@ -1,0 +1,19 @@
+experiment: candidate_filtering
+method: guarded_soft_rerank
+retention_rule: abs_rt_delta_le_threshold_or_msfinder_rank_le_guard
+reranking_score: msfinder_rank_plus_alpha_times_abs_rt_delta_over_tau
+inputs:
+  metabobase: data/candidate_filtering/metabobase_candidate_predictions.csv
+  riken_plasma: data/candidate_filtering/riken_candidate_predictions.csv
+settings:
+  metabobase:
+    threshold_seconds: 60.0
+    guard_k: 3
+    tau_seconds: 75.17
+    alpha: 1.5
+  riken_plasma:
+    threshold_seconds: 50.0
+    guard_k: 2
+    tau_seconds: 25.66
+    alpha: 2.0
+output_root: artifacts/results/candidate_filtering
