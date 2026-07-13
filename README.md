@@ -2,7 +2,13 @@
 
 TC-TopoRT is a topology-aware framework for small-molecule retention-time prediction and retention-time-guided candidate prioritization.
 
-This public repository intentionally contains only the reproducibility entry points, the minimal model/data code required by those entry points, the SMRT paired views, and the compact candidate-filtering source tables. Historical experiments, diagnostics, checkpoints, logs, generated figures, manuscript copies, and backup files are not included in the current file tree.
+This public repository contains the reproducibility entry points, the minimal model/data code required by those entry points, the SMRT paired views, compact candidate-filtering records, paper-facing configurations, and result-aggregation scripts. Historical experiments, checkpoints, logs, generated figures, manuscript copies, and backup files are intentionally excluded.
+
+Detailed documentation:
+
+- [Data sources and redistribution scope](DATA_SOURCES.md)
+- [Paper-to-code reproducibility map](REPRODUCIBILITY.md)
+- [Paper-facing configurations](configs/)
 
 ## Method overview
 
@@ -15,6 +21,8 @@ TC-TopoRT combines:
 - external transfer-learning evaluation;
 - guarded RT filtering and soft reranking of MS-FINDER candidates.
 
+Ring 2-cells are constructed from a NetworkX minimum cycle basis of each molecular graph. Cycles of sizes 3 through `max_ring_size` are retained; the paper configuration uses `max_ring_size = 6`.
+
 ## Reported results
 
 ### SMRT
@@ -23,6 +31,8 @@ TC-TopoRT combines:
 - TC-TopoRT-E: **24.920 s MAE** for the five-seed ensemble.
 - Seeds: `1, 5, 79, 123, 256`.
 - Conventional atom-bond GNN comparison: **28.252 s MAE**.
+
+The training workflow evaluates multiple OOF-only fusion controls. The formal five reported runs selected `huber_stack`, fitted only on training-set OOF predictions, and used it to generate independent-test predictions.
 
 ### External transfer
 
@@ -40,8 +50,15 @@ Across ten external datasets, transfer learning reduced MAE on **8/10 datasets**
 ```text
 .
 ├── README.md
+├── DATA_SOURCES.md
+├── REPRODUCIBILITY.md
 ├── environment.yml
 ├── requirements.txt
+├── configs/
+│   ├── smrt.yaml
+│   ├── external_transfer.yaml
+│   ├── candidate_filtering.yaml
+│   └── external_datasets.csv
 ├── data/
 │   ├── ablation/
 │   └── candidate_filtering/
@@ -50,15 +67,16 @@ Across ten external datasets, transfer learning reduced MAE on **8/10 datasets**
 │   ├── mp/                         # cell-complex data structures and CWN layers
 │   ├── net/                        # TC-TopoRT model definition
 │   ├── data/                       # dataset-provided SMRT split
-│   ├── data_taut_strict_origin_order/
-│   └── paper_analysis_stage4_external/README.md
+│   └── data_taut_strict_origin_order/
 └── scripts/
     ├── training/
     ├── data/
     ├── ablation/
     ├── transfer/
     ├── filtering/
-    └── figures/
+    ├── analysis/
+    ├── figures/
+    └── tests/
 ```
 
 All generated caches, checkpoints, predictions, metrics, logs, tables, and figures are written under `artifacts/`, which is excluded from Git.
@@ -80,9 +98,17 @@ python -m pip install -r requirements.txt
 
 PyTorch Geometric extension wheels may need to be installed for the local PyTorch/CUDA combination.
 
+## Fast smoke test
+
+```bash
+python scripts/tests/smoke_test.py
+```
+
+The test builds ring-aware cell complexes for two SMRT molecules and performs one model forward pass. It does not train a model or reproduce paper accuracy.
+
 ## SMRT data
 
-The repository includes the dataset-provided SMRT split and the paired strict tautomer-canonical view:
+The repository includes the dataset-provided SMRT split and paired strict tautomer-canonical view:
 
 ```text
 gwn/data/SMRT_train.csv
@@ -93,44 +119,47 @@ gwn/data_taut_strict_origin_order/SMRT_test_tautomer_strict.csv
 
 After the `rt > 300 s` and RDKit-validity filters, the retained split contains 70,182 training molecules and 7,798 test molecules. Strict tautomer canonicalization changes 37,724 training representations and 4,242 test representations while preserving molecular formulae.
 
-## Reproduction
+## Main reproduction commands
 
-Run commands from the repository root.
+Run commands from the repository root. See [REPRODUCIBILITY.md](REPRODUCIBILITY.md) for the complete input-command-output map.
 
-### 1. Rebuild and validate the paired views
+### Rebuild and validate paired views
 
 ```bash
 bash scripts/data/rebuild_strict_tautomer_views.sh
 bash scripts/data/validate_smrt_paired_views.sh
 ```
 
-### 2. Train one SMRT seed
+### Train one SMRT seed
 
 ```bash
 bash scripts/training/run_smrt_single_seed.sh 5
 ```
 
-The seed can also be supplied through the `SEED` environment variable. To inspect the generated command without starting training:
+Inspect the generated command without starting training:
 
 ```bash
 DRY_RUN=1 bash scripts/training/run_smrt_single_seed.sh 5
 ```
 
-### 3. Train all five paper seeds
+### Train all five paper seeds and summarize
 
 ```bash
 bash scripts/training/run_smrt_five_seeds.sh
+python scripts/analysis/summarize_smrt_results.py
+python scripts/analysis/build_dualview_ablation.py
 ```
 
-### 4. Structural and atom-bond ablations
+### Structural and atom-bond ablations
 
 ```bash
 bash scripts/ablation/run_structural_ablation.sh no2cell
 bash scripts/ablation/run_structural_ablation.sh cwn0
 bash scripts/ablation/run_atom_bond_gnn.sh
+python scripts/analysis/collect_structural_ablation.py
 ```
 
-### 5. Candidate filtering
+### Candidate filtering and sensitivity
 
 ```bash
 python scripts/filtering/run_candidate_filtering.py
@@ -139,18 +168,34 @@ python scripts/filtering/run_filtering_sensitivity.py
 
 The compact candidate-level inputs are included under `data/candidate_filtering/`.
 
-### 6. External transfer and scratch comparison
+### External transfer and scratch comparison
 
-The transfer scripts are included, but the three processed external PredRet input tables are not redistributed in this repository. Supply them through the command-line arguments documented in `gwn/paper_analysis_stage4_external/README.md`.
+The repository does not redistribute a complete PredRet database export. Convert a standardized combined PredRet table into the three inputs used by the public training scripts:
 
 ```bash
-python scripts/transfer/train_scratch_all10.py --help
-python scripts/transfer/train_transfer_all10.py --help
+python scripts/data/prepare_external_predret.py \
+  --input_csv /path/to/combined_predret.csv \
+  --out_dir artifacts/data/external
 ```
 
-Transfer learning also expects the SMRT source-fold checkpoints produced by the SMRT workflow under `artifacts/results/smrt/`.
+Then run:
 
-### 7. Generate figures
+```bash
+python scripts/transfer/train_scratch_all10.py \
+  --stage4_meta_csv artifacts/data/external/external_predret10_stage4_meta.csv \
+  --origin_csv artifacts/data/external/temp_external_predret10_origin.csv \
+  --taut_csv artifacts/data/external/temp_external_predret10_taut.csv
+
+python scripts/transfer/train_transfer_all10.py \
+  --stage4_meta_csv artifacts/data/external/external_predret10_stage4_meta.csv \
+  --origin_csv artifacts/data/external/temp_external_predret10_origin.csv \
+  --taut_csv artifacts/data/external/temp_external_predret10_taut.csv \
+  --smrt_runs_root artifacts/results/smrt
+```
+
+Transfer learning expects the SMRT source-fold checkpoints produced by the five-seed workflow.
+
+### Generate figures
 
 ```bash
 python scripts/figures/make_candidate_filtering_figure.py
@@ -161,6 +206,10 @@ python scripts/figures/make_smrt_figures.py
 
 ## Leakage control
 
-The original and tautomer-canonical views share identical labels and split assignments. Prediction-level fusion is fitted only from training-set out-of-fold predictions. Independent test labels are not used for model selection, stacker fitting, calibration, or filtering-parameter optimization.
+The original and tautomer-canonical views share identical labels and split assignments. Prediction-level fusion is fitted only from training-set out-of-fold predictions. Independent-test labels are not used for model selection, stacker fitting, calibration, or filtering-parameter optimization.
 
 Candidate-filtering comparisons use consistent candidate lists, query sets, experimental RT values, original MS-FINDER ranks, guarded-retention rules, soft-reranking definitions, and evaluation metrics.
+
+## Repository scope
+
+The repository intentionally does not commit model weights, checkpoints, caches, fold logs, generated predictions, final PDF/PNG figures, or manuscript files. These are generated outputs rather than required public inputs. Dataset provenance and third-party redistribution boundaries are documented in [DATA_SOURCES.md](DATA_SOURCES.md).
