@@ -259,9 +259,7 @@ def compute_topocell_context(smiles):
 
 
 class SMRTComplexDataset(InMemoryComplexDataset):
-    """
-    专门用于 SMRT 数据集的 Dataset 类，无缝内嵌 ABCoRT 高精度提取特征。
-    """
+
     def __init__(self, root, csv_path, max_ring_size=6, use_edge_features=True, 
                  n_jobs=4, init_method='sum', include_down_adj=True):
         self.csv_path = csv_path
