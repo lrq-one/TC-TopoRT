@@ -8,13 +8,6 @@ from net.cwn import ContinuousAtomEncoder, ContinuousBondEncoder
 
 
 class CWNHypergraphReplacementEncoder(nn.Module):
-    """
-    用 CWN 完整替换 ABCoRT 的 hypergraph encoder。
-
-    注意：
-    这里不做 molecular pooling，不直接回归。
-    它输出 atom/bond/ring cell tokens，后面交给 Transformer。
-    """
 
     def __init__(
         self,
@@ -42,7 +35,6 @@ class CWNHypergraphReplacementEncoder(nn.Module):
 
         embed_dim = hidden
 
-        # 保留 gwn/net/cwn.py 里的 CWN 核心编码器
         self.v_embed_init = ContinuousAtomEncoder(in_dim=55, emb_dim=embed_dim)
         self.e_embed_init = ContinuousBondEncoder(in_dim=21, emb_dim=embed_dim)
 
@@ -56,7 +48,6 @@ class CWNHypergraphReplacementEncoder(nn.Module):
         act_module = get_nonlinearity(nonlinearity, return_module=True)
         self.graph_norm = get_graph_norm(graph_norm)
 
-        # 保留 CINppConv 作为主体 CWN 消息传递
         self.convs = nn.ModuleList()
         for i in range(num_layers):
             layer_dim = embed_dim if i == 0 else hidden
@@ -90,19 +81,6 @@ class CWNHypergraphReplacementEncoder(nn.Module):
             self.out_dim = hidden
 
     def forward(self, data):
-        """
-        输入:
-            data: ComplexBatch
-
-        输出:
-            final_cochain_xs:
-                list[
-                    atom-cell token features,
-                    bond-cell token features,
-                    ring-cell token features
-                ]
-        """
-
         params = data.get_all_cochain_params(
             max_dim=self.max_dim,
             include_down_features=True,
@@ -158,15 +136,6 @@ class CWNHypergraphReplacementEncoder(nn.Module):
 
 
 class CWNABCoRTTransformer(nn.Module):
-    """
-    最终替换模型：
-
-    ABCoRT:
-        hypergraph encoder -> Transformer -> RT head
-
-    本模型:
-        CWN cell-complex encoder -> Transformer -> RT head
-    """
 
     def __init__(
         self,
@@ -203,7 +172,6 @@ class CWNABCoRTTransformer(nn.Module):
 
         token_in_dim = self.cwn_encoder.out_dim
 
-        # atom/bond/ring 三类 cell token 投影到 Transformer 维度
         self.cell_projectors = nn.ModuleList([
             nn.Sequential(
                 nn.Linear(token_in_dim, d_model),
@@ -214,10 +182,8 @@ class CWNABCoRTTransformer(nn.Module):
             for _ in range(max_dim + 1)
         ])
 
-        # cell 类型 embedding: 0=atom, 1=bond, 2=ring
         self.cell_type_emb = nn.Embedding(max_dim + 1, d_model)
 
-        # ABCoRT Transformer 全局交互使用 CLS token 汇聚分子表示
         self.cls_token = nn.Parameter(torch.zeros(1, 1, d_model))
 
         encoder_layer = nn.TransformerEncoderLayer(
@@ -237,7 +203,6 @@ class CWNABCoRTTransformer(nn.Module):
 
         self.post_norm = nn.LayerNorm(d_model)
 
-        # ABCoRT-style gate，控制 Transformer 后分子表示
         self.mol_gate = nn.Sequential(
             nn.Linear(d_model, d_model),
             nn.GELU(),
@@ -266,14 +231,6 @@ class CWNABCoRTTransformer(nn.Module):
         return int(batch.max().item()) + 1
 
     def _build_transformer_tokens(self, data, cochain_xs):
-        """
-        把 ragged atom/bond/ring tokens 打包成 Transformer 输入。
-
-        输出:
-            padded_tokens: [B, T, d_model]
-            padding_mask : [B, T]
-                True 表示 padding，False 表示有效 token
-        """
 
         device = cochain_xs[0].device
         batch_size = self._batch_size(data)
@@ -346,10 +303,8 @@ class CWNABCoRTTransformer(nn.Module):
         return padded, padding_mask
 
     def forward(self, data, include_partial=False):
-        # 1. CWN 完整替换 hypergraph encoder
         cochain_xs = self.cwn_encoder(data)
 
-        # 2. cell tokens 送入 Transformer
         tokens, padding_mask = self._build_transformer_tokens(data, cochain_xs)
 
         z = self.transformer(
@@ -360,10 +315,8 @@ class CWNABCoRTTransformer(nn.Module):
         cls_h = z[:, 0, :]
         cls_h = self.post_norm(cls_h)
 
-        # 3. ABCoRT-style molecular gate
         cls_h = cls_h * self.mol_gate(cls_h)
 
-        # 4. RT head
         out = self.regression_head(cls_h).view(-1)
 
         if include_partial:
