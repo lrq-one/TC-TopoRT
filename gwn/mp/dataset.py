@@ -9,9 +9,8 @@ from torch_geometric.data import Dataset
 from itertools import repeat, product
 from mp.complex import Complex, Cochain
 from torch import Tensor
-# 原来的可能是: from typing import List, Optional
-# 修改为:
-from typing import List, Optional, Tuple  # <--- 加上这个
+
+from typing import List, Optional, Tuple  
 
 def __repr__(obj):
     if obj is None:
@@ -19,11 +18,6 @@ def __repr__(obj):
     return re.sub('(<.*?)\\s.*(>)', r'\1\2', obj.__repr__())
 
 class ComplexDataset(Dataset, ABC):
-    """Base class for cochain complex datasets.
-
-    This class mirrors
-    https://github.com/rusty1s/pytorch_geometric/blob/76d61eaa9fc8702aa25f29dfaa5134a169d0f1f6/torch_geometric/data/dataset.py#L19
-    """
 
     def __init__(self, root=None, transform=None, pre_transform=None, pre_filter=None,
                  max_dim: int = None, num_classes: int = None, init_method: str = 'sum',
@@ -80,30 +74,7 @@ class ComplexDataset(Dataset, ABC):
             'test': self.test_ids}
         return idx_split
 
-"""
-2. InMemoryComplexDataset 类
-这是实际用于存储和加载数据的类，它继承自 ComplexDataset。
-类似物：PyG 中的 torch_geometric.data.InMemoryDataset。
-设计模式：它使用了 PyG 经典的 "Collate & Slice"（拼合与切片） 存储机制。
-为什么需要这个类？（核心难点解析）
-在深度学习中，如果我们要处理 10,000 个小的复形对象，直接把它们存成一个 Python list 效率很低（内存碎片化，读取慢）。
-PyG 的做法（以及这段代码的做法）是：
-Collate (拼合)：把这 10,000 个小复形的所有节点拼在一起，所有边拼在一起，所有面拼在一起，形成一个巨大的“超级复形”。
-Slice (切片/索引)：记录每一个小复形在“超级复形”中的起始位置和结束位置。
-关键方法解析：
-collate(data_list, max_dim) [静态方法]
-作用：压缩。将一个包含多个 Complex 对象的列表，转换成一个巨大的 data 对象（包含大张量）和一个 slices 对象（索引）。
-逻辑：它遍历 0 到 max_dim 的每一个维度，将所有样本在该维度上的特征（如 x）和邻接信息（如 index）进行 torch.cat（拼接）。
-细节：它非常智能，能处理不同类型的属性（Tensor, int, float），并根据属性的维度决定是堆叠（stack）还是拼接（cat）。
-get(idx)
-作用：解压。根据索引 idx，从巨大的 data 和 slices 中还原出第 i 个 Complex 对象。
-流程：
-调用 _get_cochain(dim, idx) 循环提取每一维的数据（例如：提取第 idx 个图的节点、边、面）。
-将这些提取出的链（Cochains）重新组装成一个 Complex 对象。
-提取对应的标签 y。
-process() 和 download()
-这里只是声明了接口（raise NotImplementedError），具体的下载和处理逻辑留给子类（比如你之前发的 ClusterDataset）去实现。
-"""
+
 class InMemoryComplexDataset(ComplexDataset):
     """Wrapper around ComplexDataset with functionality such as batching and storing the dataset.
 
@@ -359,7 +330,7 @@ class InMemoryComplexDataset(ComplexDataset):
         dataset = copy.copy(self)
         dataset.__indices__ = None
         dataset.__data_list__ = data_list
-        # === [核心修复]：补上缺失的 max_dim 参数 ===
+
         dataset.data, dataset.slices = self.collate(data_list, self.max_dim)
             
         return dataset
@@ -373,10 +344,3 @@ class InMemoryComplexDataset(ComplexDataset):
         if self.__indices__ is not None:
             raise AssertionError("Cannot get the split for a subset of the original dataset.")
         return self[idx]
-
-"""
-总结：这段代码与之前代码的关系
-1. 之前的代码 (ClusterDataset, CSLDataset)：是用户层。它们负责“怎么下载数据”和“怎么把原始数据变成复形”。
-2. 这段代码 (InMemoryComplexDataset)：是底层引擎。
-◦ 它告诉程序：“一旦你把数据变成了复形，请交给我。我会把它们高效地打包存进内存，训练的时候如果你要第 5 个样本，我会迅速把它切出来给你。”
-"""
