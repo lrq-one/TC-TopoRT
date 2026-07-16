@@ -6,24 +6,7 @@ from net.cwn_abcort_transformer import CWNHypergraphReplacementEncoder
 
 
 class CWNHypergraphAdapter(nn.Module):
-    """
-    这个模块只做一件事：
-    用 CWN 替换 ABCoRT 的 hypergraph encoder。
-
-    输入:
-        ComplexBatch
-
-    输出:
-        tokens: [B, 3, out_dim]
-            3 个 token 分别是 atom-token / bond-token / ring-token
-
-    注意:
-        不做 RT 回归；
-        不做最终 SE gate；
-        不替换 Transformer；
-        不替换 head。
-    """
-
+    
     def __init__(
         self,
         hidden=256,
@@ -106,5 +89,4 @@ class CWNHypergraphAdapter(nn.Module):
 
         tokens = torch.stack(tokens, dim=1)  # [B, 3, out_dim]
 
-        # mask 先给 None，因为每个分子固定 3 个 token
         return tokens, None
