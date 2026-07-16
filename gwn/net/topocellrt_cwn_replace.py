@@ -6,21 +6,7 @@ from net.cwn_hypergraph_adapter import CWNHypergraphAdapter
 
 
 class TopoCellRTCWNReplace(nn.Module):
-    """
-    严格替换版：
-
-    替换掉师兄 model_topocellrt.py 里的：
-        conv1~conv6 + graphline 高阶编码器
-
-    保留师兄后半段：
-        trans_graph
-        trans_add SE-style gate
-        layerNorm_out
-        trans_out
-        global_feat gate
-        out_lin
-    """
-
+    
     def __init__(
         self,
         emb_dim=256,
@@ -34,8 +20,7 @@ class TopoCellRTCWNReplace(nn.Module):
         self.emb_dim = emb_dim
         self.drop_ratio = drop_ratio
 
-        # CWN 替代原来的 hypergraph / TopoCellRTBlock encoder
-        # 输出 [B, 3, emb_dim * 2]，对齐原 trans_graph 的输入维度
+
         self.cwn_adapter = CWNHypergraphAdapter(
             hidden=cwn_hidden,
             out_dim=emb_dim * 2,
@@ -48,7 +33,6 @@ class TopoCellRTCWNReplace(nn.Module):
 
         self.layerNorm_out = nn.LayerNorm(emb_dim * 2)
 
-        # 以下保持和 model_topocellrt.py 里的 TopoCellRTNet 一致
         self.trans_graph = nn.Sequential(
             nn.Linear(emb_dim * 2, emb_dim * 4),
             nn.GELU(),
@@ -97,22 +81,18 @@ class TopoCellRTCWNReplace(nn.Module):
         )
 
     def forward(self, data, include_partial=False):
-        # 1. CWN 替换原 hypergraph encoder，输出 atom/bond/ring 三个 token
+
         tokens, mask = self.cwn_adapter(data)  # [B, 3, 512]
 
-        # 2. 对齐师兄代码：先 trans_graph，再 pool
         tokens = self.trans_graph(tokens)      # [B, 3, 512]
         add_x = tokens.sum(dim=1)              # [B, 512]
 
-        # 3. 师兄原 SE-style gate
         score = torch.sigmoid(self.trans_add(add_x))
         result = torch.mul(score, add_x)
         result = self.layerNorm_out(result)
 
-        # 4. 师兄原 trans_out
         result = self.trans_out(result)
 
-        # 5. 师兄原 global_feat gate
         if hasattr(data, "global_feat") and data.global_feat is not None:
             g = data.global_feat.float().to(result.device)
             g = g.view(g.size(0), -1)
