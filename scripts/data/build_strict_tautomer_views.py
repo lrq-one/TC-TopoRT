@@ -9,7 +9,7 @@ RDLogger.DisableLog("rdApp.*")
 
 TAUT = rdMolStandardize.TautomerEnumerator()
 
-# 尽量避免极端分子枚举太久
+
 try:
     TAUT.SetMaxTautomers(128)
 except Exception:
@@ -43,13 +43,7 @@ def formula(mol):
 
 
 def strict_tautomer_view(smiles):
-    """
-    只统计真正的 tautomer canonical 改变。
-
-    不用 raw SMILES 和 tautomer SMILES 直接比较，
-    而是先把原始 mol canonicalize，再和 tautomer canonical 比较。
-    这样可以避免把普通 SMILES 重排误判为 tautomer changed。
-    """
+    """"""
     original = str(smiles)
     mol = safe_mol(original)
 
@@ -79,7 +73,7 @@ def strict_tautomer_view(smiles):
         taut_formula = formula(taut_mol)
         taut_heavy = taut_mol.GetNumHeavyAtoms()
 
-        # 互变异构应该保持分子式和重原子数
+        
         formula_same = int(orig_formula == taut_formula)
         heavy_same = int(orig_heavy == taut_heavy)
 
@@ -98,7 +92,7 @@ def strict_tautomer_view(smiles):
 
         real_changed = int(taut_canon != orig_canon)
 
-        # 关键：没有真正 tautomer 改变时，保持官方原始 SMILES，不强行 canonicalize
+        
         if real_changed:
             new_smile = taut_canon
         else:

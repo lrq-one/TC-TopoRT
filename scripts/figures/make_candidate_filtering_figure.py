@@ -287,7 +287,7 @@ def main():
         fontsize=5.3,
     )
 
-    # 关键：legend 横向放在标题下面，不放到底部
+    
     legend_labels_short = {
         "MS-FINDER only / No RT": "MSF only / No RT",
         "RT-Transformer-TL": "RT-Transf.-TL",
@@ -305,7 +305,7 @@ def main():
         for m in topk_methods
     ]
 
-    # 给 C 面板上方留更多空位，避免 legend 压子图
+    
     subC = gs[1, 0].subgridspec(1, 2, wspace=0.22)
     axC1 = fig.add_subplot(subC[0, 0])
     axC2 = fig.add_subplot(subC[0, 1], sharey=axC1)
@@ -339,7 +339,7 @@ def main():
     axC1.set_ylabel("Accuracy (%)")
     axC2.tick_params(labelleft=False)
 
-    # 把子图整体往下压一点，避免和上面的 legend 打架
+    
     for ax in [axC1, axC2]:
         pos = ax.get_position()
         ax.set_position([pos.x0, pos.y0 + 0.018, pos.width, pos.height * 0.82])

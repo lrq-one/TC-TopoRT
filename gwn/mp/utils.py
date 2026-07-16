@@ -167,43 +167,40 @@ def generate_cochain(dim, x, all_upper_index, all_lower_index,
 # ==================================================================================
 
 def get_rings(edge_index, max_k=7):
-    """
-    使用 NetworkX 查找分子中的环 (Cycle Basis)。
-    这替代了原先不稳定的 graph-tool 实现。
-    """
+    """"""
     if isinstance(edge_index, torch.Tensor):
         edge_index = edge_index.numpy()
     
-    # 构建 NetworkX 图
+    
     rows, cols = edge_index
     g = nx.Graph()
-    # zip 处理边列表
+    
     edges = list(zip(rows, cols))
     g.add_edges_from(edges)
     
-    # === [核心修复]：替换 cycle_basis 为 minimum_cycle_basis ===
-    # 确保找到的是真实的化学环（如稠环的两个 6 元环），而不是外围大环
+    
+    
     cycles = nx.minimum_cycle_basis(g)
     
     rings = []
     for cycle in cycles:
-        # 过滤长度，并且排序以保证唯一性 (canonical form)
+        
         if 3 <= len(cycle) <= max_k:
             rings.append(tuple(sorted(cycle)))
             
-    # 去重
+    
     return list(set(rings))
 
 
 def build_tables_with_rings(edge_index, simplex_tree, size, max_k):
-    # 复用单纯复形的逻辑建立 0-dim (节点) 和 1-dim (边) 表
+    
     cell_tables, id_maps = build_tables(simplex_tree, size)
     
-    # 使用新的 get_rings 函数 (NetworkX backend)
+    
     rings = get_rings(edge_index, max_k=max_k)
     
     if len(rings) > 0:
-        # 将环作为 2-cells 加入
+        
         id_maps += [{}]
         cell_tables += [[]]
         for cell in rings:
@@ -219,38 +216,38 @@ def get_ring_boundaries(ring):
     for n in range(len(ring)):
         a = n
         b = 0 if n + 1 == len(ring) else n + 1
-        # 边界是边，需要排序以匹配 id_maps 中的 key
+        
         boundaries.append(tuple(sorted([ring[a], ring[b]])))
     return sorted(boundaries)
 
 
 def extract_boundaries_and_coboundaries_with_rings(simplex_tree, id_maps):
-    # 先提取节点和边的关系
+    
     boundaries_tables, boundaries, coboundaries = extract_boundaries_and_coboundaries_from_simplex_tree(
                                                     simplex_tree, id_maps, simplex_tree.dimension())
     
-    if len(id_maps) == 3: # 如果有环 (2-cells)
+    if len(id_maps) == 3: 
         boundaries += [{}]
         coboundaries += [{}]
         boundaries_tables += [[]]
         
-        # 遍历所有环
-        for cell in id_maps[2]: # cell 是环的元组 (node_idx1, node_idx2, ...)
+        
+        for cell in id_maps[2]: 
             cell_boundaries = get_ring_boundaries(cell)
             boundaries[2][cell] = list()
             boundaries_tables[2].append([])
             
             for boundary in cell_boundaries:
-                # 确保构成环的边都在 1-cell 字典里
+                
                 if boundary not in id_maps[1]:
-                    # 极其罕见的情况：环存在但边不存在（通常不会发生，除非预处理有问题）
+                    
                     continue
                     
                 boundary_id = id_maps[1][boundary]
                 boundaries[2][cell].append(boundary)
                 boundaries_tables[2][-1].append(boundary_id)
                 
-                # 反向建立 coboundary 关系 (边 -> 环)
+                
                 if boundary not in coboundaries[1]:
                     coboundaries[1][boundary] = list()
                 coboundaries[1][boundary].append(cell)
@@ -266,51 +263,51 @@ def compute_ring_2complex(x: Union[Tensor, np.ndarray], edge_index: Union[Tensor
                           include_down_adj=True, init_method: str = 'sum',
                           init_edges=True, init_rings=False) -> Complex:
     
-    # 数据格式统一转为 Tensor
+    
     if isinstance(x, np.ndarray): x = torch.tensor(x)
     if isinstance(edge_index, np.ndarray): edge_index = torch.tensor(edge_index)
     if isinstance(edge_attr, np.ndarray): edge_attr = torch.tensor(edge_attr)
     if isinstance(y, np.ndarray): y = torch.tensor(y)
     if isinstance(global_feat, np.ndarray): global_feat = torch.tensor(global_feat)
 
-    # 1. 建立单纯复形 (Simplex Tree)
+    
     simplex_tree = pyg_to_simplex_tree(edge_index, size)
 
-    # 2. 建立 Cell Tables (包含环)
+    
     cell_tables, id_maps = build_tables_with_rings(edge_index, simplex_tree, size, max_k)
     complex_dim = len(id_maps)-1
 
-    # 3. 提取边界关系
+    
     boundaries_tables, boundaries, co_boundaries = extract_boundaries_and_coboundaries_with_rings(simplex_tree, id_maps)
 
-    # 4. 构建邻接关系 (Adjacencies)
+    
     shared_boundaries, shared_coboundaries, lower_idx, upper_idx = build_adj(
         boundaries, co_boundaries, id_maps, complex_dim, include_down_adj)
     
-    # 5. 构建特征 (Features)
+    
     xs = [x, None, None]
     constructed_features = construct_features(x, cell_tables, init_method)
     
-    # 处理 2-cell (环) 特征初始化
+    
     if init_rings and len(constructed_features) > 2:
         xs[2] = constructed_features[2]
     elif len(cell_tables) > 2:
-        # 如果不初始化环特征，给个全0占位，防止后续 forward 报错
+        
         xs[2] = torch.zeros(len(cell_tables[2]), x.size(1))
     
-    # 处理 1-cell (边) 特征
+    
     if init_edges and complex_dim >= 1:
         if edge_attr is None:
             xs[1] = constructed_features[1]
         else:
             if edge_attr.dim() == 1: edge_attr = edge_attr.view(-1, 1)
-            # 映射 edge_attr 到我们内部的 edge id
-            # 这是一个关键步骤，因为 PyG 的 edge_index 顺序可能和 id_maps[1] 的顺序不一致
+            
+            
             num_edges = len(id_maps[1])
             edge_feat_dim = edge_attr.size(1)
             xs[1] = torch.zeros(num_edges, edge_feat_dim)
             
-            # 创建临时查找表: canonical_edge -> feat
+            
             edge_feat_map = {}
             row, col = edge_index
             for k in range(row.size(0)):
@@ -322,19 +319,19 @@ def compute_ring_2complex(x: Union[Tensor, np.ndarray], edge_index: Union[Tensor
                 if edge_tuple in edge_feat_map:
                     xs[1][edge_id] = edge_feat_map[edge_tuple]
                     
-    # 6. 生成 Cochains
+    
     v_y, complex_y = extract_labels(y, size)
     cochains = []
     for i in range(complex_dim + 1):
         target = v_y if i == 0 else None
-        # === [核心修复]：根据层级匹配正确的填充维度 ===
+        
         if xs[i] is None: 
             num_entities = len(cell_tables[i])
             if i == 1 and edge_attr is not None:
-                # 如果是边，且存在原始 edge_attr，使用边的维度
+                
                 feat_dim = edge_attr.size(1) if edge_attr.dim() > 1 else 1
             else:
-                # 节点和环使用节点的维度
+                
                 feat_dim = x.size(1)
             xs[i] = torch.zeros(num_entities, feat_dim, dtype=torch.float)
             
@@ -349,10 +346,10 @@ def convert_graph_dataset_with_rings(dataset, max_ring_size=7, include_down_adj=
                                      init_method: str = 'sum', init_edges=True, init_rings=False,
                                      n_jobs=1):
     
-    # 简单的串行处理 (Debugging easier)
-    # 或者使用 joblib 并行
+    
+    
     def process_one(data):
-        # 提取 global_feat (如果存在)
+        
         global_feat = getattr(data, 'global_feat', None)
         return compute_ring_2complex(
             data.x, data.edge_index, data.edge_attr,

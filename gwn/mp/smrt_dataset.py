@@ -14,16 +14,16 @@ from rdkit.Chem import Descriptors
 from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem import rdPartialCharges
 
-# 引入项目内部模块
+
 from mp.dataset import InMemoryComplexDataset
 from mp.utils import convert_graph_dataset_with_rings
 from mp.complex import ComplexBatch
 
 # =========================================================================
-# 💡 核心升级区：内嵌 ABCoRT 高精度特征工程 (Feature Engineering)
+
 # =========================================================================
 
-# 🌟 [升级]：加入 is_in_ring_size_n（9D），让每个原子明确感知自己所在的环大小（3~10元环），共 55 维！
+
 atom_features = [
     'chiral_center', 'cip_code', 'crippen_log_p_contrib', 
     'crippen_molar_refractivity_contrib', 'degree', 'element',
@@ -31,8 +31,8 @@ atom_features = [
     'is_aromatic', 'is_h_acceptor', 'is_h_donor', 'is_hetero',
     'labute_asa_contrib','num_hs', 'num_valence',
     'tpsa_contrib', 'atom_in_ring', 
-    'formal_charge', 'mass',  # <-- 找回丢失的 4 维极其关键的物理量
-    'is_in_ring_size_n',  # <-- [新增] 9D 环大小 one-hot：让原子显式感知5元环/6元环/大环等 (46D -> 55D)
+    'formal_charge', 'mass',  
+    'is_in_ring_size_n',  
 ]
 
 bond_features = [
@@ -49,7 +49,7 @@ def encode(x: Union[float, int, str]) -> List[float]:
         x = 0.0
     return [float(x)]
 
-# ----------------- 原子特征提取函数 -----------------
+
 def is_in_ring(bond: Chem.Bond) -> List[float]:
     return encode(x=bond.IsInRing())
 
@@ -192,7 +192,7 @@ def labute_asa_contrib(atom: Chem.Atom) -> List[float]:
 def gasteiger_charge(atom: Chem.Atom) -> List[float]:
     return encode(x=atom.GetDoubleProp('_GasteigerCharge') if atom.HasProp('_GasteigerCharge') else 0.0)
 
-# ----------------- 总调度提取器 -----------------
+
 def bond_featurizer(bond: Chem.Bond) -> np.ndarray:
     return np.concatenate([globals()[bond_feature](bond) for bond_feature in bond_features], axis=0)
 
@@ -265,20 +265,18 @@ def compute_topocell_context(smiles):
 
 
 # =========================================================================
-# SMRT 数据集定义
+
 # =========================================================================
 
 class SMRTComplexDataset(InMemoryComplexDataset):
-    """
-    专门用于 SMRT 数据集的 Dataset 类，无缝内嵌 ABCoRT 高精度提取特征。
-    """
+    """"""
     def __init__(self, root, csv_path, max_ring_size=6, use_edge_features=True, 
                  n_jobs=4, init_method='sum', include_down_adj=True):
         self.csv_path = csv_path
         self._max_ring_size = max_ring_size
         self._use_edge_features = use_edge_features
         self._n_jobs = n_jobs
-        # 🌟🌟🌟 补上下面这两行 🌟🌟🌟
+        
         self._init_method = init_method
         self.include_down_adj = include_down_adj
         super(SMRTComplexDataset, self).__init__(
@@ -297,7 +295,7 @@ class SMRTComplexDataset(InMemoryComplexDataset):
 
     @property
     def processed_dir(self):
-        # 强制更新缓存文件夹名称，确保提取到真正的 46维/21维 特征
+        
         suffix = f"_r{self._max_ring_size}_Full46D_Embedded"
         if self._use_edge_features: suffix += "_E"
         return os.path.join(self.root, 'processed' + suffix)
@@ -309,27 +307,27 @@ class SMRTComplexDataset(InMemoryComplexDataset):
     def process(self):
         print(f"Processing raw data from: {self.csv_path}")
         try:
-            # 1. 尝试标准读取
+            
             df = pd.read_csv(self.csv_path, engine="python")
             
-            # 2. 清理列名（去除空格并转小写）
+            
             df.columns = [str(c).lower().strip() for c in df.columns]
             
-            # 🌟 3. 核心修复：ABCoRT 官方表的列名是 'smile'，自动把它改为 'smiles'
+            
             if 'smile' in df.columns and 'smiles' not in df.columns:
                 df.rename(columns={'smile': 'smiles'}, inplace=True)
                 
-            # 4. 如果连 smile 也没有，才尝试备选方案
+            
             if 'smiles' not in df.columns or 'rt' not in df.columns:
                 df = pd.read_csv(self.csv_path, sep=r"\s+", names=["smiles", "rt"], header=0, engine="python")
                 
-            # 5. 过滤死体积
+            
             df = df[df['rt'] > 300.0]
             print(f"✅ 成功读取数据集，有效分子数: {len(df)}")
             
         except Exception as e:
             print(f"❌ 读取 CSV 彻底失败: {e}")
-            raise e  # 🚨 必须使用 raise e 强制让程序在这里崩溃，绝对不能用 return！
+            raise e  
             
         data_list = []
         print("Step 1/2: Extracting EXACT ABCoRT Features (Full 46D Atoms, 21D Bonds)...")
@@ -348,14 +346,14 @@ class SMRTComplexDataset(InMemoryComplexDataset):
             mol = Chem.MolFromSmiles(smiles)
             if mol is None: continue
             
-            # 🌟🌟🌟 [核心修复] 必须强制计算手性和电荷，否则提取出来全是 0！ 🌟🌟🌟
+            
             Chem.AssignStereochemistry(mol, force=True, cleanIt=True)
             try:
                 rdPartialCharges.ComputeGasteigerCharges(mol)
             except:
-                pass # 忽略少数无法计算电荷的奇葩分子
+                pass 
 
-            # --- A. 构建原汁原味的 46 维原子特征 ---
+            
             atom_features_list = []
             for atom in mol.GetAtoms():
                 atom_feat = atom_featurizer(atom)
@@ -363,7 +361,7 @@ class SMRTComplexDataset(InMemoryComplexDataset):
                 
             x = torch.tensor(np.array(atom_features_list), dtype=torch.float)
 
-            # --- B. 构建原汁原味的 21 维边特征 ---
+            
             edge_index_list = []
             edge_attr_list = []
             for bond in mol.GetBonds():
@@ -384,7 +382,7 @@ class SMRTComplexDataset(InMemoryComplexDataset):
                 edge_index = torch.tensor(edge_index_list).t().contiguous()
                 edge_attr = torch.tensor(np.array(edge_attr_list), dtype=torch.float) 
 
-            # --- C. 构建 Data 对象 ---
+            
             y = torch.tensor([rt], dtype=torch.float)
 
             global_feat, hard_flag = compute_topocell_context(smiles)

@@ -9,9 +9,9 @@ from torch_geometric.data import Dataset
 from itertools import repeat, product
 from mp.complex import Complex, Cochain
 from torch import Tensor
-# 原来的可能是: from typing import List, Optional
-# 修改为:
-from typing import List, Optional, Tuple  # <--- 加上这个
+
+
+from typing import List, Optional, Tuple  
 
 def __repr__(obj):
     if obj is None:
@@ -359,7 +359,7 @@ class InMemoryComplexDataset(ComplexDataset):
         dataset = copy.copy(self)
         dataset.__indices__ = None
         dataset.__data_list__ = data_list
-        # === [核心修复]：补上缺失的 max_dim 参数 ===
+        
         dataset.data, dataset.slices = self.collate(data_list, self.max_dim)
             
         return dataset

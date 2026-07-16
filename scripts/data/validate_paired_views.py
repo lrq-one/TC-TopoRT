@@ -34,7 +34,7 @@ def load_rt_smiles(path, name):
     df = df.copy()
     df["rt"] = df["rt"].astype(float)
 
-    # 与 SMRTComplexDataset / train 脚本保持一致：rt > 300，再 RDKit valid
+    
     df = df[df["rt"] > 300.0].reset_index(drop=False).rename(columns={"index": "source_row"})
 
     rows = []
@@ -102,7 +102,7 @@ def compare_pair(origin_csv, taut_csv, split_name):
             )
         raise SystemExit(1)
 
-    # 如果 taut CSV 是 strict 脚本生成的，应有 orig_smile
+    
     if "orig_smile" in taut.columns:
         raw_same = (origin["smiles"].astype(str).values == taut["orig_smile"].astype(str).values)
         canon_same = (origin["canon"].astype(str).values == taut["orig_canon"].astype(str).values)
