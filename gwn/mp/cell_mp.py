@@ -7,21 +7,18 @@ from torch import Tensor
 from torch_sparse import SparseTensor
 from torch_scatter import gather_csr, scatter, segment_csr
 
-# --- 修改 A: 确保引用的是同目录下的 cell_mp_inspector ---
-# 如果你运行脚本时报 ModuleNotFoundError，请尝试改成: from mp.cell_mp_inspector import ...
+
 try:
     from mp.cell_mp_inspector import CellularInspector
 except ImportError:
     from cell_mp_inspector import CellularInspector
 
-# --- 修改 B: 手动实现 expand_left (因为 PyG 已移除该工具) ---
 def expand_left(src: Tensor, dim: int, dims: int) -> Tensor:
     for _ in range(dims - src.dim()):
         src = src.unsqueeze(dim)
     return src
 
 class CochainMessagePassing(torch.nn.Module):
-    """The base class for building message passing models on cochain complexes."""
 
     special_args: Set[str] = {
         'up_index', 'up_adj_t', 'up_index_i', 'up_index_j', 'up_size',
@@ -58,7 +55,7 @@ class CochainMessagePassing(torch.nn.Module):
         self.aggr_boundary = aggr_boundary
         assert self.aggr_up in ['add', 'mean', 'max', None]
         assert self.aggr_down in ['add', 'mean', 'max', None]
-        # === [修复]：增加对边界聚合参数的安全校验 ===
+
         assert self.aggr_boundary in ['add', 'mean', 'max', None]
         self.flow = flow
         assert self.flow in ['source_to_target', 'target_to_source']
