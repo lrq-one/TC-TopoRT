@@ -10,7 +10,6 @@ def get_nonlinearity(nonlinearity, return_module=True):
     elif nonlinearity == 'elu':
         module = torch.nn.ELU
         function = F.elu
-    # === [新增]：增加 GELU 支持，提升回归任务的梯度平滑度 ===
     elif nonlinearity == 'gelu':
         module = torch.nn.GELU
         function = F.gelu
@@ -19,7 +18,6 @@ def get_nonlinearity(nonlinearity, return_module=True):
         function = lambda x: x
     elif nonlinearity == 'sigmoid':
         module = torch.nn.Sigmoid
-        # 替换被 PyTorch 弃用的 F.sigmoid
         function = torch.sigmoid 
     elif nonlinearity == 'tanh':
         module = torch.nn.Tanh
@@ -54,16 +52,14 @@ def pool_complex(xs, data, max_dim, readout_type):
     # All complexes have nodes so we can extract the batch size from cochains[0]
     batch_size = data.cochains[0].batch.max() + 1
     
-    # === [优化]：使用 xs[0].device 防止特征和 batch 索引不在同一个 GPU 上导致设备冲突 ===
     device = xs[0].device 
     
     # The MP output is of shape [message_passing_dim, batch_size, feature_dim]
     pooled_xs = torch.zeros(max_dim+1, batch_size, xs[0].size(-1), device=device)
     
     for i in range(len(xs)):
-        # === [核心修复]：拦截无环图导致的空 batch 索引 ===
         if data.cochains[i].batch is None or xs[i].size(0) == 0:
-            continue  # 如果该维度没有结构（如无环），直接跳过，保持全 0
+            continue  
             
         # It's very important that size is supplied.
         pooled_xs[i, :, :] = pooling_fn(xs[i], data.cochains[i].batch, size=batch_size)
