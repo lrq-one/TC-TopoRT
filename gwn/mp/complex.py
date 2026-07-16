@@ -141,7 +141,7 @@ class Cochain(object):
         if self.x is not None:
             return self.x.size(self.__cat_dim__('x', self.x))
         if self.boundary_index is not None:
-            # === [核心修复]：防止直链分子产生空边界张量导致的 max() 崩溃 ===
+
             if self.boundary_index.numel() == 0:
                 return 0
             return int(self.boundary_index[1,:].max()) + 1
@@ -161,7 +161,7 @@ class Cochain(object):
             return self.__num_cells_up__
         elif self.shared_coboundaries is not None:
             assert self.upper_index is not None
-            # === [核心修复]：防止无环图的上边界矩阵为空导致的 max() 崩溃 ===
+
             if self.shared_coboundaries.numel() == 0:
                 return 0
             return int(self.shared_coboundaries.max()) + 1
