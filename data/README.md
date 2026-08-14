@@ -24,9 +24,10 @@ analysis scripts operate when those study inputs are supplied separately.
 
 The original SMRT deposit provides the complete 80,038-record files
 `SMRT_dataset.csv` and `SMRT_dataset.sdf`; it does not provide named train and
-test CSVs. TC-TopoRT retains the predefined benchmark partition supplied as
-`SMRT_train_set.txt` and `SMRT_test_set.txt`, converts only the column names and
-CSV serialization, applies `RT > 300 s`, and requires RDKit-valid structures.
+test CSVs. TC-TopoRT uses the train/test partition used in this study,
+represented locally as `SMRT_train_set.txt` and `SMRT_test_set.txt`, converts
+only the column names and CSV serialization, applies `RT > 300 s`, and requires
+RDKit-valid structures.
 The resulting retained inputs contain 70,182 training records and 7,798 test
 records. This study does not generate a new train/test split.
 

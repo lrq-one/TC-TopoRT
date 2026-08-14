@@ -1,5 +1,5 @@
 experiment: candidate_filtering
-method: independent_development_hard_filter
+method: development_calibrated_hard_filter
 
 rule:
   threshold_formula: "3 * MAE_dev"
@@ -12,6 +12,9 @@ inputs:
   metabobase: data/local/candidate_filtering/metabobase_candidate_predictions.csv
   riken_plasma: data/local/candidate_filtering/riken_plasma_candidate_predictions.csv
 
+# The reported mae_dev_seconds values are rounded to three decimals.
+# threshold_seconds stores the frozen threshold calculated from the
+# corresponding full-precision development MAE before rounding.
 development:
   metabobase:
     n_queries: 30

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Apply the final-paper retention-time candidate filter.
 
-The threshold for each predictor is frozen from an independent development
-set as ``3 * MAE_dev``.  Candidates with a missing prediction are retained;
-otherwise a candidate is retained when its absolute RT error is no greater
-than the frozen threshold.  Filtering never changes the original MS-FINDER
-ordering.
+The threshold for each predictor is calibrated on a fixed development set
+held out from the calibration-model fit and frozen as ``3 * MAE_dev``.
+Candidates with a missing prediction are retained; otherwise a candidate is
+retained when its absolute RT error is no greater than the frozen threshold.
+Filtering never changes the original MS-FINDER ordering.
 
 Frozen candidate-level inputs are distributed in the author Figshare archive,
 not in this source-code repository.  See ``data/README.md`` for placement.

@@ -19,7 +19,7 @@ equilibria.
 - `scripts/training/`: one-seed and five-seed SMRT entry points.
 - `scripts/ablation/`: No2Cell and parameter-matched atom-bond GINE controls.
 - `scripts/transfer/`: ten-dataset transfer-versus-scratch experiment.
-- `scripts/filtering/`: final independently calibrated candidate filter.
+- `scripts/filtering/`: final development-calibrated hard candidate filter.
 - `scripts/analysis/` and `scripts/figures/`: final-paper and SI analyses.
 - `scripts/tests/`: dataset-free static, smoke, and filtering-rule checks.
 - `docs/`: detailed reproduction and supplementary-analysis notes.
@@ -124,7 +124,8 @@ small positive transfer benefit.
 
 ## Candidate filtering
 
-For predictor `m`, the threshold is frozen on an independent development set:
+For predictor `m`, the threshold is calibrated on a fixed development set held
+out from the calibration-model fit:
 
 ```text
 T_m = 3 × MAE_dev,m
