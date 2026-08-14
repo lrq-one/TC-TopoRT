@@ -35,11 +35,12 @@ The original METLIN SMRT benchmark source is available at
 This is the original source benchmark, not the authors' TC-TopoRT archive.
 External datasets remain subject to their original sources and terms.
 
-The separate author Figshare archive contains trained models, final predictions,
-candidate lists, candidate-level filtering outputs, development-calibration
-records, frozen thresholds, final configuration snapshots, and a checksum
-manifest. Its DOI will be added after the deposit is finalized; no DOI is
-invented here. See [data/README.md](data/README.md) for local placement.
+The separate author Figshare archive is available at
+[DOI 10.6084/m9.figshare.33252810](https://doi.org/10.6084/m9.figshare.33252810).
+It contains trained models, final predictions, candidate lists, candidate-level
+filtering outputs, development-calibration records, frozen thresholds, final
+configuration snapshots, and a checksum manifest. See
+[data/README.md](data/README.md) for local placement.
 
 ## Environment
 

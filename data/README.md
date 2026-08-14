@@ -10,11 +10,11 @@ That DOI identifies the original benchmark source; it is not the authors'
 TC-TopoRT archive. External transfer datasets must likewise be obtained from
 their original public resources and used under their original terms.
 
-The separate TC-TopoRT author Figshare archive provides trained models, frozen
-predictions, candidate lists, candidate-level filtering outputs, development
-calibration records, thresholds, final configuration snapshots, and checksums.
-Its DOI will be added after the deposit is finalized; no author-archive DOI is
-claimed in this repository yet.
+The separate TC-TopoRT author Figshare archive is available at
+[DOI 10.6084/m9.figshare.33252810](https://doi.org/10.6084/m9.figshare.33252810).
+It provides trained models, frozen predictions, candidate lists, candidate-level
+filtering outputs, development-calibration records, thresholds, final
+configuration snapshots, and checksums.
 
 Matched Full-versus-No2Cell, pairwise, and Norharman-specific analysis inputs
 are not claimed as contents of the author archive. The corresponding public
@@ -35,7 +35,7 @@ The complete split files are third-party data and are not tracked here. The
 current public repository also does not contain an independent split-ID manifest
 or a DOI-to-partition generation procedure, so reconstructing the exact
 partition from `SMRT_dataset.csv` alone is not claimed. Users reproducing the
-benchmark must supply the same predefined partition at the paths below.
+benchmark must supply the same study partition at the paths below.
 
 After downloading or preparing the inputs, use this local layout:
 
