@@ -34,7 +34,7 @@ def load_rt_smiles(path, name):
     df = df.copy()
     df["rt"] = df["rt"].astype(float)
 
-    # 与 SMRTComplexDataset / train 脚本保持一致：rt > 300，再 RDKit valid
+    # Match the training loader: apply RT > 300 and then require an RDKit-valid molecule.
     df = df[df["rt"] > 300.0].reset_index(drop=False).rename(columns={"index": "source_row"})
 
     rows = []
@@ -102,7 +102,7 @@ def compare_pair(origin_csv, taut_csv, split_name):
             )
         raise SystemExit(1)
 
-    # 如果 taut CSV 是 strict 脚本生成的，应有 orig_smile
+    # Strict standardized-view files record their source structure in orig_smile.
     if "orig_smile" in taut.columns:
         raw_same = (origin["smiles"].astype(str).values == taut["orig_smile"].astype(str).values)
         canon_same = (origin["canon"].astype(str).values == taut["orig_canon"].astype(str).values)
@@ -122,7 +122,7 @@ def compare_pair(origin_csv, taut_csv, split_name):
                 )
             raise SystemExit(1)
     else:
-        print("⚠️ taut CSV has no orig_smile column. 不建议用于正式 dual-view。")
+        print("WARNING: tautomer CSV has no orig_smile column; do not use it for the final paired-view workflow.")
 
     changed = (origin["canon"].astype(str).values != taut["canon"].astype(str).values)
     print("taut view changed canonical:", int(changed.sum()), "/", len(changed), "ratio:", float(changed.mean()))
@@ -141,7 +141,7 @@ def main():
     compare_pair(args.origin_train, args.taut_train, "TRAIN")
     compare_pair(args.origin_test, args.taut_test, "TEST")
 
-    print("\n✅ ALL CHECKS PASSED. 可以进入 dual-view 训练脚本阶段。")
+    print("\nALL CHECKS PASSED. The files are ready for paired-view training.")
 
 
 if __name__ == "__main__":

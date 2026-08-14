@@ -1,0 +1,45 @@
+experiment: smrt_benchmark
+retention_filter:
+  condition: "RT > 300 s"
+  train_records: 70182
+  independent_test_records: 7798
+views:
+  original: dataset_provided_structure
+  standardized: conservative_strict_tautomer_standardization
+  paired_by_row_and_rt_label: true
+model:
+  max_ring_size: 6
+  cwn_layers: 6
+  cwn_hidden: 256
+training:
+  seeds: [1, 5, 79, 123, 256]
+  folds: 5
+  epochs: 150
+  patience: 30
+  batch_size: 64
+  evaluation_batch_size: 64
+  learning_rate: 0.0001
+  weight_decay: 0.01
+  huber_beta: 1.0
+fusion:
+  protocol: leakage_free_oof_huber
+  huber_alpha: 0.0001
+  stack_temperature: 5.0
+expected_five_run_metrics:
+  mae_seconds:
+    mean: 25.055090
+    sample_sd: 0.039094
+  mre_percent:
+    mean: 3.161936
+    sample_sd: 0.004679
+  medae_seconds:
+    mean: 11.316787
+    sample_sd: 0.097631
+  rmse_seconds:
+    mean: 55.671332
+    sample_sd: 0.100621
+  r2:
+    mean: 0.898308
+    sample_sd: 0.000368
+expected_five_model_average_mae_seconds: 24.920
+

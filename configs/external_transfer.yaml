@@ -1,0 +1,36 @@
+experiment: external_transfer_vs_scratch
+datasets:
+  - FEM_short_73
+  - UniToyama_Atlantis_143
+  - FEM_long_412
+  - Eawag_XBridgeC18_364
+  - LIFE_old_194
+  - MTBLS87_147
+  - LIFE_new_184
+  - Cao_HILIC_116
+  - IPB_Halle_82
+  - FEM_lipids_72
+cross_validation:
+  folds: 10
+  seed: 1
+training:
+  epochs: 150
+  batch_size: 8
+  evaluation_batch_size: 64
+  learning_rate: 0.0001
+  weight_decay: 0.01
+  huber_beta: 1.0
+  max_ring_size: 6
+comparison:
+  transfer_initialization: SMRT_pretrained
+  scratch_initialization: random
+expected_summary:
+  transfer_better_datasets: 8
+  total_datasets: 10
+  mean_mae_improvement_seconds: 9.164
+  median_mae_improvement_seconds: 3.677
+  scratch_better:
+    - Cao_HILIC_116
+    - IPB_Halle_82
+  note: MTBLS87_147 has a small positive transfer benefit.
+

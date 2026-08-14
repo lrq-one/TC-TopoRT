@@ -1,5 +1,0 @@
-| variant | max_ring_size | cwn_layers | exists | selected_stacker | mae | medae | rmse | r2 | p95 | p99 | gt80 | gt100 | gt200 | bias | n | metrics_path | delta_mae_vs_full_seed5 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Full TCDV-TopoRT seed5 | 6 | 6 | True | huber_stack | 25.0122 | 11.3496 | 55.5852 | 0.8986 | 85.8803 | 284.4433 | 433 | 313 | 131 | 1.8735 | 7798 | gwn/results_OOF_DualView_Stack_seed5/final_metrics.json | 0.0000 |
-| w/o explicit ring 2-cells | 2 | 6 | True | huber_stack | 25.1016 | 11.5190 | 55.4837 | 0.8990 | 85.5643 | 279.4196 | 441 | 323 | 137 | 1.7903 | 7798 | ablations/gwn_cwn_structural_ablation/results_Ablation_No2Cell_DualView_Stack_seed5/final_metrics.json | 0.0894 |
-| w/o CWN message passing | 6 | 0 | True | huber_stack | 39.6453 | 22.1701 | 68.3821 | 0.8466 | 136.3284 | 300.0988 | 943 | 659 | 179 | -0.0235 | 7798 | ablations/gwn_cwn_structural_ablation/results_Ablation_CWN0_DualView_Stack_seed5/final_metrics.json | 14.6331 |

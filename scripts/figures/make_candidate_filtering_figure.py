@@ -16,15 +16,15 @@ datasets = ["MetaboBase", "RIKEN-PlaSMA"]
 
 # Panel A
 initial = [3023, 5044]
-retained = [933, 2712]
-reduction_tc = [69.14, 46.23]
+retained = [1782, 3513]
+reduction_tc = [41.05, 30.35]
 
 # Panel B
 reduction_baselines = {
-    "RT-Transformer-TL": [8.18, 11.14],
-    "DeepGCN-RT-TL": [29.64, 35.37],
-    "ABCoRT-TL": [38.35, 28.46],
-    "TC-TopoRT": [69.14, 46.23],
+    "RT-Transformer-TL": [9.92, 6.09],
+    "DeepGCN-RT-TL": [42.54, 22.50],
+    "ABCoRT-TL": [38.41, 26.74],
+    "TC-TopoRT": [41.05, 30.35],
 }
 
 # Panel C
@@ -39,23 +39,23 @@ topk_methods = [
 
 topk_metabobase = {
     "MS-FINDER only / No RT": [44.44, 75.56, 84.44],
-    "RT-Transformer-TL": [33.33, 64.44, 73.33],
-    "DeepGCN-RT-TL": [42.22, 66.67, 75.56],
-    "ABCoRT-TL": [51.11, 73.33, 82.22],
-    "TC-TopoRT": [55.56, 82.22, 88.89],
+    "RT-Transformer-TL": [44.44, 75.56, 86.67],
+    "DeepGCN-RT-TL": [51.11, 71.11, 82.22],
+    "ABCoRT-TL": [48.89, 71.11, 82.22],
+    "TC-TopoRT": [46.67, 75.56, 86.67],
 }
 
 topk_riken = {
     "MS-FINDER only / No RT": [47.06, 70.59, 82.35],
-    "RT-Transformer-TL": [47.06, 77.65, 83.53],
-    "DeepGCN-RT-TL": [57.65, 75.29, 83.53],
-    "ABCoRT-TL": [52.94, 76.47, 83.53],
-    "TC-TopoRT": [54.12, 77.65, 89.41],
+    "RT-Transformer-TL": [48.24, 72.94, 82.35],
+    "DeepGCN-RT-TL": [50.59, 75.29, 84.71],
+    "ABCoRT-TL": [50.59, 72.94, 81.18],
+    "TC-TopoRT": [52.94, 74.12, 84.71],
 }
 
 # Panel D
-true_retention = [93.33, 97.65]
-fn_text = ["FN = 3 / 45", "FN = 2 / 85"]
+true_retention = [93.33, 98.82]
+fn_text = ["FN = 3 / 45", "FN = 1 / 85"]
 
 # ============================================================
 # Style
@@ -287,7 +287,7 @@ def main():
         fontsize=5.3,
     )
 
-    # 关键：legend 横向放在标题下面，不放到底部
+    # Keep the horizontal legend below the title.
     legend_labels_short = {
         "MS-FINDER only / No RT": "MSF only / No RT",
         "RT-Transformer-TL": "RT-Transf.-TL",
@@ -305,7 +305,7 @@ def main():
         for m in topk_methods
     ]
 
-    # 给 C 面板上方留更多空位，避免 legend 压子图
+    # Reserve space above panel C so the legend does not overlap the axes.
     subC = gs[1, 0].subgridspec(1, 2, wspace=0.22)
     axC1 = fig.add_subplot(subC[0, 0])
     axC2 = fig.add_subplot(subC[0, 1], sharey=axC1)
@@ -339,7 +339,7 @@ def main():
     axC1.set_ylabel("Accuracy (%)")
     axC2.tick_params(labelleft=False)
 
-    # 把子图整体往下压一点，避免和上面的 legend 打架
+    # Shift the panels down slightly to preserve legend clearance.
     for ax in [axC1, axC2]:
         pos = ax.get_position()
         ax.set_position([pos.x0, pos.y0 + 0.018, pos.width, pos.height * 0.82])

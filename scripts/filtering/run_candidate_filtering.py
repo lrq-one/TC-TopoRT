@@ -1,918 +1,363 @@
 #!/usr/bin/env python3
-"""
-Reproduce the final TC-TopoRT candidate-filtering results.
+"""Apply the final-paper retention-time candidate filter.
 
-Retention rule:
-    |predicted RT - experimental RT| <= T
-    OR original MS-FINDER rank <= g
+The threshold for each predictor is frozen from an independent development
+set as ``3 * MAE_dev``.  Candidates with a missing prediction are retained;
+otherwise a candidate is retained when its absolute RT error is no greater
+than the frozen threshold.  Filtering never changes the original MS-FINDER
+ordering.
 
-Soft-reranking score:
-    MS-FINDER rank + alpha * |Delta RT| / tau
-
-Tie-breaking:
-    hybrid score ascending,
-    original MS-FINDER rank ascending,
-    original MS-FINDER score descending.
+Frozen candidate-level inputs are distributed in the author Figshare archive,
+not in this source-code repository.  See ``data/README.md`` for placement.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
+import math
+import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
-import numpy as np
 import pandas as pd
+import yaml
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_CONFIG = REPO_ROOT / "configs" / "candidate_filtering.yaml"
 
-DEFAULT_OUT_DIR = (
-    "artifacts/results/candidate_filtering"
-)
+DATASET_ALIASES = {
+    "metabobase": "metabobase",
+    "riken": "riken_plasma",
+    "riken-plasma": "riken_plasma",
+    "riken_plasma": "riken_plasma",
+}
 
-CONFIGS: list[dict[str, Any]] = [
-    {
-        "dataset": "MetaboBase",
-        "slug": "metabobase",
-        "input": (
-            'data/candidate_filtering/metabobase_candidate_predictions.csv'
-        ),
-        "group_columns": ["s10_row", "query_id"],
-        "threshold_sec": 60.0,
-        "guard_k": 3,
-        "tau": 75.17,
-        "alpha": 1.5,
-        "reference": {
-            "queries": 45,
-            "before": 3023,
-            "after": 933,
-            "reduction": 69.136619,
-            "true_retention": 93.333333,
-            "top1_before": 44.444444,
-            "top5_before": 75.555556,
-            "top10_before": 84.444444,
-            "top1_after": 55.555556,
-            "top5_after": 82.222222,
-            "top10_after": 88.888889,
-            "false_negatives": 3,
-        },
-        "abcort": {
-            "after": 1864,
-            "reduction": 38.35,
-            "top1": 51.11,
-            "top5": 73.33,
-            "top10": 82.22,
-        },
-    },
-    {
-        "dataset": "RIKEN-PlaSMA",
-        "slug": "riken_plasma",
-        "input": (
-            'data/candidate_filtering/riken_candidate_predictions.csv'
-        ),
-        "group_columns": ["s11_row", "query_id"],
-        "threshold_sec": 50.0,
-        "guard_k": 2,
-        "tau": 25.66,
-        "alpha": 2.0,
-        "reference": {
-            "queries": 85,
-            "before": 5044,
-            "after": 2712,
-            "reduction": 46.233148,
-            "true_retention": 97.647059,
-            "top1_before": 47.058824,
-            "top5_before": 70.588235,
-            "top10_before": 82.352941,
-            "top1_after": 54.117647,
-            "top5_after": 77.647059,
-            "top10_after": 89.411765,
-            "false_negatives": 2,
-        },
-        "abcort": {
-            "after": 3608,
-            "reduction": 28.46,
-            "top1": 52.94,
-            "top5": 76.47,
-            "top10": 83.53,
-        },
-    },
-]
+COLUMN_ALIASES = {
+    "query_id": ("query_id", "query_identifier", "query", "spectrum_id"),
+    "candidate_id": (
+        "candidate_id",
+        "candidate_uid",
+        "candidate_identifier",
+        "candidate_inchikey",
+        "inchikey",
+        "candidate_smiles",
+        "smiles",
+    ),
+    "rank": (
+        "original_candidate_rank",
+        "candidate_rank",
+        "msfinder_rank",
+        "initial_rank",
+        "rank",
+    ),
+    "experimental_rt": (
+        "experimental_rt",
+        "experimental_rt_seconds",
+        "rt_sec",
+        "query_rt_sec",
+        "exp_rt",
+        "rt",
+    ),
+    "predicted_rt": (
+        "predicted_rt",
+        "predicted_rt_seconds",
+        "candidate_pred_rt",
+        "pred_rt",
+        "prediction",
+    ),
+    "is_true": ("is_true", "true_candidate", "is_true_candidate", "true_flag"),
+}
 
 
-def resolve_path(value: str | Path) -> Path:
-    path = Path(value)
+@dataclass(frozen=True)
+class InputSchema:
+    """Resolved input columns for one candidate table."""
 
-    if path.is_absolute():
-        return path
+    query_id: str
+    candidate_id: str | None
+    rank: str
+    experimental_rt: str
+    predicted_rt: str
+    is_true: str
 
-    return (REPO_ROOT / path).resolve()
+
+def _first_present(columns: Iterable[str], aliases: Iterable[str]) -> str | None:
+    available = set(columns)
+    return next((name for name in aliases if name in available), None)
 
 
-def bool_series(series: pd.Series) -> pd.Series:
+def resolve_schema(frame: pd.DataFrame) -> InputSchema:
+    """Resolve supported public/archive column names without guessing values."""
+
+    resolved = {
+        key: _first_present(frame.columns, aliases)
+        for key, aliases in COLUMN_ALIASES.items()
+    }
+    missing = [
+        key
+        for key in ("query_id", "rank", "experimental_rt", "predicted_rt", "is_true")
+        if resolved[key] is None
+    ]
+    if missing:
+        choices = {key: list(COLUMN_ALIASES[key]) for key in missing}
+        raise ValueError(
+            "Candidate input is missing required fields "
+            f"{missing}. Accepted column names: {choices}"
+        )
+    return InputSchema(**resolved)  # type: ignore[arg-type]
+
+
+def _coerce_true_flag(series: pd.Series) -> pd.Series:
     if pd.api.types.is_bool_dtype(series):
         return series.fillna(False).astype(bool)
-
-    normalized = (
-        series.astype(str)
-        .str.strip()
-        .str.lower()
-    )
-
-    return normalized.isin(
-        {"1", "true", "t", "yes", "y"}
-    )
-
-
-def topk(rank: float | int | None, k: int) -> bool:
-    if rank is None or pd.isna(rank):
-        return False
-
-    return float(rank) <= float(k)
-
-
-def detect_group_column(
-    frame: pd.DataFrame,
-    candidates: list[str],
-) -> str:
-    for column in candidates:
-        if column in frame.columns:
-            return column
-
-    raise KeyError(
-        "No query-group column was found. "
-        f"Tried {candidates}; available columns are "
-        f"{list(frame.columns)}"
-    )
-
-
-def prepare_input(
-    csv_path: Path,
-    group_candidates: list[str],
-) -> tuple[pd.DataFrame, str]:
-    if not csv_path.is_file():
-        raise FileNotFoundError(csv_path)
-
-    frame = pd.read_csv(
-        csv_path,
-        low_memory=False,
-    )
-
-    required = {
-        "candidate_rank",
-        "abs_rt_delta",
-        "is_true",
+    if pd.api.types.is_numeric_dtype(series):
+        values = pd.to_numeric(series, errors="raise")
+        invalid = ~values.isin([0, 1])
+        if invalid.any():
+            raise ValueError("True-candidate flags must contain only 0/1 or booleans.")
+        return values.fillna(0).astype(bool)
+    normalized = series.astype("string").str.strip().str.lower()
+    mapping = {
+        "true": True,
+        "false": False,
+        "1": True,
+        "0": False,
+        "yes": True,
+        "no": False,
     }
-
-    missing = sorted(
-        required - set(frame.columns)
-    )
-
-    if missing:
-        raise KeyError(
-            f"{csv_path} is missing columns: {missing}"
-        )
-
-    group_col = detect_group_column(
-        frame,
-        group_candidates,
-    )
-
-    frame = frame.copy()
-
-    frame["_source_row"] = np.arange(
-        len(frame),
-        dtype=int,
-    )
-
-    frame["candidate_rank"] = pd.to_numeric(
-        frame["candidate_rank"],
-        errors="raise",
-    )
-
-    frame["abs_rt_delta"] = pd.to_numeric(
-        frame["abs_rt_delta"],
-        errors="raise",
-    )
-
-    if "candidate_score" not in frame.columns:
-        frame["candidate_score"] = 0.0
-
-    frame["candidate_score"] = pd.to_numeric(
-        frame["candidate_score"],
-        errors="coerce",
-    ).fillna(0.0)
-
-    frame["is_true"] = bool_series(
-        frame["is_true"]
-    )
-
-    return frame, group_col
+    unknown = normalized.dropna()[~normalized.dropna().isin(mapping)]
+    if not unknown.empty:
+        raise ValueError(f"Unrecognized true-candidate flag: {unknown.iloc[0]!r}")
+    return normalized.map(mapping).fillna(False).astype(bool)
 
 
-def evaluate(
+def filter_candidates(
     frame: pd.DataFrame,
-    group_col: str,
-    threshold_sec: float,
-    guard_k: int,
-    tau: float,
-    alpha: float,
+    threshold_seconds: float,
+    schema: InputSchema | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
-    result = frame.copy()
+    """Filter candidates and return candidate, query, and dataset summaries."""
 
-    result["retained"] = (
-        result["abs_rt_delta"].le(
-            threshold_sec
-        )
-        | result["candidate_rank"].le(
-            guard_k
-        )
+    if frame.empty:
+        raise ValueError("Candidate input is empty.")
+    if not math.isfinite(threshold_seconds) or threshold_seconds < 0:
+        raise ValueError("The frozen threshold must be a finite non-negative number.")
+
+    schema = schema or resolve_schema(frame)
+    work = pd.DataFrame(index=frame.index)
+    work["query_id"] = frame[schema.query_id].astype("string")
+    if work["query_id"].isna().any() or (work["query_id"].str.len() == 0).any():
+        raise ValueError("Query identifiers must not be missing or empty.")
+
+    if schema.candidate_id is None:
+        work["candidate_id"] = [f"row_{index + 1}" for index in range(len(frame))]
+    else:
+        work["candidate_id"] = frame[schema.candidate_id].astype("string")
+
+    work["original_candidate_rank"] = pd.to_numeric(frame[schema.rank], errors="raise")
+    if work["original_candidate_rank"].isna().any() or (
+        work["original_candidate_rank"] <= 0
+    ).any():
+        raise ValueError("Original candidate ranks must be positive and non-missing.")
+
+    work["experimental_rt"] = pd.to_numeric(
+        frame[schema.experimental_rt], errors="coerce"
     )
+    if work["experimental_rt"].isna().any():
+        raise ValueError("Experimental RT must be present and numeric for every record.")
 
-    result["hybrid_score"] = (
-        result["candidate_rank"]
-        + alpha
-        * result["abs_rt_delta"]
-        / tau
-    )
+    work["predicted_rt"] = pd.to_numeric(frame[schema.predicted_rt], errors="coerce")
+    work["is_true"] = _coerce_true_flag(frame[schema.is_true])
+    work["_input_order"] = range(len(work))
+    work["_query_order"] = work.groupby("query_id", sort=False)["_input_order"].transform("min")
 
-    result["rank_after"] = np.nan
-
-    query_rows: list[dict[str, Any]] = []
-
-    for query_key, sub in result.groupby(
-        group_col,
-        sort=True,
-        dropna=False,
-    ):
-        sub = sub.copy()
-
-        original = sub.sort_values(
-            [
-                "candidate_rank",
-                "candidate_score",
-            ],
-            ascending=[
-                True,
-                False,
-            ],
-            kind="mergesort",
-        )
-
-        true_before_rows = original[
-            original["is_true"]
-        ]
-
-        if true_before_rows.empty:
-            true_rank_before = np.nan
-            true_abs_rt_delta = np.nan
-        else:
-            true_rank_before = float(
-                true_before_rows[
-                    "candidate_rank"
-                ].min()
-            )
-
-            true_abs_rt_delta = float(
-                true_before_rows.iloc[0][
-                    "abs_rt_delta"
-                ]
-            )
-
-        retained = sub[
-            sub["retained"]
-        ].copy()
-
-        retained = retained.sort_values(
-            [
-                "hybrid_score",
-                "candidate_rank",
-                "candidate_score",
-            ],
-            ascending=[
-                True,
-                True,
-                False,
-            ],
-            kind="mergesort",
-        ).reset_index(drop=True)
-
-        retained["rank_after"] = np.arange(
-            1,
-            len(retained) + 1,
-            dtype=int,
-        )
-
-        rank_map = dict(
-            zip(
-                retained["_source_row"],
-                retained["rank_after"],
-            )
-        )
-
-        mask = result["_source_row"].isin(
-            rank_map
-        )
-
-        result.loc[
-            mask,
-            "rank_after",
-        ] = result.loc[
-            mask,
-            "_source_row",
-        ].map(rank_map)
-
-        true_after_rows = retained[
-            retained["is_true"]
-        ]
-
-        if true_after_rows.empty:
-            true_rank_after = np.nan
-        else:
-            true_rank_after = float(
-                true_after_rows[
-                    "rank_after"
-                ].min()
-            )
-
-        query_rows.append(
-            {
-                "query_key": query_key,
-                "n_candidates_before": int(
-                    len(sub)
-                ),
-                "n_candidates_after": int(
-                    len(retained)
-                ),
-                "true_rank_before": (
-                    true_rank_before
-                ),
-                "true_rank_after": (
-                    true_rank_after
-                ),
-                "true_retained_after": bool(
-                    not true_after_rows.empty
-                ),
-                "true_abs_rt_delta": (
-                    true_abs_rt_delta
-                ),
-                "top1_before": topk(
-                    true_rank_before, 1
-                ),
-                "top5_before": topk(
-                    true_rank_before, 5
-                ),
-                "top10_before": topk(
-                    true_rank_before, 10
-                ),
-                "top1_after": topk(
-                    true_rank_after, 1
-                ),
-                "top5_after": topk(
-                    true_rank_after, 5
-                ),
-                "top10_after": topk(
-                    true_rank_after, 10
-                ),
-            }
-        )
-
-    query_table = pd.DataFrame(
-        query_rows
-    )
-
-    before = int(
-        query_table[
-            "n_candidates_before"
-        ].sum()
-    )
-
-    after = int(
-        query_table[
-            "n_candidates_after"
-        ].sum()
-    )
-
-    summary = {
-        "n_queries": int(
-            len(query_table)
-        ),
-        "n_candidate_rows_before": before,
-        "n_candidate_rows_after": after,
-        "candidate_reduction_pct": (
-            100.0
-            * (before - after)
-            / max(before, 1)
-        ),
-        "true_retention_pct": (
-            100.0
-            * query_table[
-                "true_retained_after"
-            ].mean()
-        ),
-        "top1_before_pct": (
-            100.0
-            * query_table[
-                "top1_before"
-            ].mean()
-        ),
-        "top5_before_pct": (
-            100.0
-            * query_table[
-                "top5_before"
-            ].mean()
-        ),
-        "top10_before_pct": (
-            100.0
-            * query_table[
-                "top10_before"
-            ].mean()
-        ),
-        "top1_after_pct": (
-            100.0
-            * query_table[
-                "top1_after"
-            ].mean()
-        ),
-        "top5_after_pct": (
-            100.0
-            * query_table[
-                "top5_after"
-            ].mean()
-        ),
-        "top10_after_pct": (
-            100.0
-            * query_table[
-                "top10_after"
-            ].mean()
-        ),
-        "false_negatives": int(
-            (
-                ~query_table[
-                    "true_retained_after"
-                ]
-            ).sum()
-        ),
-    }
-
-    result = result.sort_values(
-        [
-            group_col,
-            "candidate_rank",
-            "candidate_score",
-        ],
-        ascending=[
-            True,
-            True,
-            False,
-        ],
-        kind="mergesort",
+    # A stable sort makes the preserved MS-FINDER ordering explicit.
+    work = work.sort_values(
+        ["_query_order", "original_candidate_rank", "_input_order"], kind="stable"
     ).reset_index(drop=True)
+    work["abs_rt_delta"] = (work["experimental_rt"] - work["predicted_rt"]).abs()
+    work["retained"] = work["predicted_rt"].isna() | (
+        work["abs_rt_delta"] <= float(threshold_seconds)
+    )
 
-    return result, query_table, summary
+    position = work.groupby("query_id", sort=False)["retained"].cumsum()
+    work["rank_after_filtering"] = position.where(work["retained"]).astype("Int64")
+
+    rows: list[dict[str, Any]] = []
+    for query_id, group in work.groupby("query_id", sort=False):
+        true_rows = group[group["is_true"]]
+        if true_rows.empty:
+            raise ValueError(f"Query {query_id!r} has no true candidate in the input list.")
+        true_original_rank = float(true_rows["original_candidate_rank"].min())
+        retained_true = true_rows[true_rows["retained"]]
+        true_retained = not retained_true.empty
+        true_final_rank = (
+            int(retained_true["rank_after_filtering"].min()) if true_retained else pd.NA
+        )
+        rows.append(
+            {
+                "query_id": query_id,
+                "initial_candidate_count": int(len(group)),
+                "retained_candidate_count": int(group["retained"].sum()),
+                "true_retained": bool(true_retained),
+                "FN": int(not true_retained),
+                "true_original_rank": true_original_rank,
+                "true_rank_after_filtering": true_final_rank,
+                "Top1": bool(true_retained and true_final_rank <= 1),
+                "Top5": bool(true_retained and true_final_rank <= 5),
+                "Top10": bool(true_retained and true_final_rank <= 10),
+            }
+        )
+
+    query_summary = pd.DataFrame(rows)
+    before = int(len(work))
+    after = int(work["retained"].sum())
+    queries = int(len(query_summary))
+    true_retained_count = int(query_summary["true_retained"].sum())
+    dataset_summary: dict[str, Any] = {
+        "queries": queries,
+        "candidate_records_before": before,
+        "candidate_records_after": after,
+        "candidate_reduction_percent": 100.0 * (before - after) / before,
+        "candidate_reduction_denominator": "candidate_records_before",
+        "true_retained_count": true_retained_count,
+        "true_retained_percent": 100.0 * true_retained_count / queries,
+        "false_negatives": int(query_summary["FN"].sum()),
+        "Top1_count": int(query_summary["Top1"].sum()),
+        "Top5_count": int(query_summary["Top5"].sum()),
+        "Top10_count": int(query_summary["Top10"].sum()),
+        "retention_and_topk_denominator": "queries",
+        "threshold_seconds": float(threshold_seconds),
+    }
+
+    candidate_output = work[
+        [
+            "query_id",
+            "candidate_id",
+            "original_candidate_rank",
+            "experimental_rt",
+            "predicted_rt",
+            "abs_rt_delta",
+            "retained",
+            "is_true",
+            "rank_after_filtering",
+        ]
+    ].copy()
+    return candidate_output, query_summary, dataset_summary
 
 
-def validate_reference(
+def load_config(path: Path) -> dict[str, Any]:
+    with path.open(encoding="utf-8") as handle:
+        config = yaml.safe_load(handle)
+    if not isinstance(config, dict):
+        raise ValueError(f"Configuration must contain a YAML mapping: {path}")
+    return config
+
+
+def _dataset_threshold(config: dict[str, Any], dataset: str, method: str) -> float:
+    try:
+        threshold = config["development"][dataset]["methods"][method]["threshold_seconds"]
+    except KeyError as error:
+        raise KeyError(f"Missing configuration key for {dataset}/{method}: {error}") from error
+    return float(threshold)
+
+
+def _default_input(config: dict[str, Any], dataset: str) -> Path:
+    value = config.get("inputs", {}).get(dataset)
+    if not value:
+        value = f"data/local/candidate_filtering/{dataset}_candidate_predictions.csv"
+    path = Path(value).expanduser()
+    return path if path.is_absolute() else REPO_ROOT / path
+
+
+def run_one(
     dataset: str,
-    summary: dict[str, Any],
-    reference: dict[str, Any],
-) -> None:
-    exact_checks = {
-        "n_queries": "queries",
-        "n_candidate_rows_before": "before",
-        "n_candidate_rows_after": "after",
-        "false_negatives": "false_negatives",
-    }
+    method: str,
+    input_path: Path,
+    output_dir: Path,
+    config: dict[str, Any],
+) -> dict[str, Any]:
+    if not input_path.is_file():
+        raise FileNotFoundError(
+            f"Final candidate-level input not found: {input_path}\n"
+            "Download the frozen author-generated candidate table from the TC-TopoRT "
+            "Figshare archive and place it as described in data/README.md, or pass --input."
+        )
+    threshold = _dataset_threshold(config, dataset, method)
+    frame = pd.read_csv(input_path)
+    candidates, queries, summary = filter_candidates(frame, threshold)
+    summary.update({"dataset": dataset, "method": method, "input": str(input_path)})
 
-    for summary_key, reference_key in exact_checks.items():
-        actual = int(summary[summary_key])
-        expected = int(reference[reference_key])
-
-        if actual != expected:
-            raise RuntimeError(
-                f"{dataset}: {summary_key} "
-                f"{actual} != {expected}"
-            )
-
-    float_checks = {
-        "candidate_reduction_pct": "reduction",
-        "true_retention_pct": "true_retention",
-        "top1_before_pct": "top1_before",
-        "top5_before_pct": "top5_before",
-        "top10_before_pct": "top10_before",
-        "top1_after_pct": "top1_after",
-        "top5_after_pct": "top5_after",
-        "top10_after_pct": "top10_after",
-    }
-
-    for summary_key, reference_key in float_checks.items():
-        actual = float(summary[summary_key])
-        expected = float(reference[reference_key])
-
-        if not np.isclose(
-            actual,
-            expected,
-            atol=1e-5,
-            rtol=0.0,
-        ):
-            raise RuntimeError(
-                f"{dataset}: {summary_key} "
-                f"{actual} != {expected}"
-            )
+    dataset_dir = output_dir / dataset
+    dataset_dir.mkdir(parents=True, exist_ok=True)
+    candidates.to_csv(dataset_dir / "candidate_level_filtering.csv", index=False)
+    queries.to_csv(dataset_dir / "query_level_summary.csv", index=False)
+    with (dataset_dir / "dataset_summary.json").open("w", encoding="utf-8") as handle:
+        json.dump(summary, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+    return summary
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--metabobase_csv",
-        default=CONFIGS[0]["input"],
+        "--config", type=Path, default=DEFAULT_CONFIG, help="Final filtering YAML configuration."
     )
     parser.add_argument(
-        "--riken_csv",
-        default=CONFIGS[1]["input"],
+        "--dataset",
+        choices=["metabobase", "riken_plasma", "riken", "riken-plasma", "all"],
+        required=True,
+        help="Candidate dataset to process.",
+    )
+    parser.add_argument("--method", default="tc_toport", help="Predictor key in the configuration.")
+    parser.add_argument(
+        "--input",
+        type=Path,
+        help="Candidate CSV for a single dataset; omit to use the configured local path.",
     )
     parser.add_argument(
-        "--out_dir",
-        default=DEFAULT_OUT_DIR,
+        "--output-dir",
+        type=Path,
+        default=REPO_ROOT / "artifacts" / "results" / "candidate_filtering",
+        help="Directory for generated candidate/query/dataset summaries.",
     )
-    parser.add_argument(
-        "--dry_run",
-        type=int,
-        choices=[0, 1],
-        default=0,
-    )
-    parser.add_argument(
-        "--skip_reference_validation",
-        type=int,
-        choices=[0, 1],
-        default=0,
-    )
+    return parser.parse_args(argv)
 
-    args = parser.parse_args()
 
-    inputs = {
-        "MetaboBase": resolve_path(
-            args.metabobase_csv
-        ),
-        "RIKEN-PlaSMA": resolve_path(
-            args.riken_csv
-        ),
-    }
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    config_path = args.config.expanduser().resolve()
+    config = load_config(config_path)
 
-    out_dir = resolve_path(
-        args.out_dir
-    )
+    if args.dataset == "all":
+        if args.input is not None:
+            raise ValueError("--input can only be used when processing one dataset.")
+        datasets = ["metabobase", "riken_plasma"]
+    else:
+        datasets = [DATASET_ALIASES[args.dataset]]
 
-    print("=" * 88)
-    print(
-        "TC-TopoRT final candidate-filtering workflow"
-    )
-    print("=" * 88)
-
-    for config in CONFIGS:
-        print()
-        print(config["dataset"])
-        print(
-            " input:",
-            inputs[config["dataset"]],
+    output_dir = args.output_dir.expanduser().resolve()
+    summaries = []
+    for dataset in datasets:
+        input_path = args.input.expanduser().resolve() if args.input else _default_input(config, dataset)
+        summary = run_one(
+            dataset,
+            args.method,
+            input_path,
+            output_dir,
+            config,
         )
-        print(
-            " T/g/tau/alpha:",
-            config["threshold_sec"],
-            config["guard_k"],
-            config["tau"],
-            config["alpha"],
-        )
-
-    print()
-    print("output:", out_dir)
-
-    if args.dry_run:
-        print()
-        print(
-            "DRY RUN: no filtering was executed."
-        )
-        return
-
-    out_dir.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    selected_rows = []
-    main_table_rows = []
-    parameter_rows = []
-
-    for config in CONFIGS:
-        dataset = config["dataset"]
-
-        frame, group_col = prepare_input(
-            inputs[dataset],
-            config["group_columns"],
-        )
-
-        ranked, queries, summary = evaluate(
-            frame=frame,
-            group_col=group_col,
-            threshold_sec=float(
-                config["threshold_sec"]
-            ),
-            guard_k=int(
-                config["guard_k"]
-            ),
-            tau=float(
-                config["tau"]
-            ),
-            alpha=float(
-                config["alpha"]
-            ),
-        )
-
-        if not args.skip_reference_validation:
-            validate_reference(
-                dataset,
-                summary,
-                config["reference"],
-            )
-
-        dataset_dir = (
-            out_dir / config["slug"]
-        )
-        dataset_dir.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        ranked.to_csv(
-            dataset_dir
-            / "candidate_reranking.csv",
-            index=False,
-        )
-
-        queries.to_csv(
-            dataset_dir
-            / "query_filtering_metrics.csv",
-            index=False,
-        )
-
-        selected_rows.append(
-            {
-                "Dataset": dataset,
-                "T (s)": config[
-                    "threshold_sec"
-                ],
-                "g": config["guard_k"],
-                "tau (s)": config["tau"],
-                "alpha": config["alpha"],
-                "Queries": summary[
-                    "n_queries"
-                ],
-                "Candidates before": summary[
-                    "n_candidate_rows_before"
-                ],
-                "Candidates after": summary[
-                    "n_candidate_rows_after"
-                ],
-                "Reduction (%)": summary[
-                    "candidate_reduction_pct"
-                ],
-                "True retained (%)": summary[
-                    "true_retention_pct"
-                ],
-                "False negatives": summary[
-                    "false_negatives"
-                ],
-                "Top-1 (%)": summary[
-                    "top1_after_pct"
-                ],
-                "Top-5 (%)": summary[
-                    "top5_after_pct"
-                ],
-                "Top-10 (%)": summary[
-                    "top10_after_pct"
-                ],
-            }
-        )
-
-        main_table_rows.append(
-            {
-                "Dataset": dataset,
-                "Method": (
-                    "MS-FINDER only / No RT"
-                ),
-                "Queries": summary[
-                    "n_queries"
-                ],
-                "Initial candidates": summary[
-                    "n_candidate_rows_before"
-                ],
-                "Retained candidates": summary[
-                    "n_candidate_rows_before"
-                ],
-                "Reduction (%)": 0.0,
-                "Top-1 (%)": summary[
-                    "top1_before_pct"
-                ],
-                "Top-5 (%)": summary[
-                    "top5_before_pct"
-                ],
-                "Top-10 (%)": summary[
-                    "top10_before_pct"
-                ],
-                "True retained (%)": 100.0,
-                "False negatives": 0,
-            }
-        )
-
-        abcort = config["abcort"]
-
-        main_table_rows.append(
-            {
-                "Dataset": dataset,
-                "Method": "ABCoRT-TL",
-                "Queries": summary[
-                    "n_queries"
-                ],
-                "Initial candidates": summary[
-                    "n_candidate_rows_before"
-                ],
-                "Retained candidates": abcort[
-                    "after"
-                ],
-                "Reduction (%)": abcort[
-                    "reduction"
-                ],
-                "Top-1 (%)": abcort["top1"],
-                "Top-5 (%)": abcort["top5"],
-                "Top-10 (%)": abcort["top10"],
-                "True retained (%)": np.nan,
-                "False negatives": np.nan,
-            }
-        )
-
-        main_table_rows.append(
-            {
-                "Dataset": dataset,
-                "Method": "TC-TopoRT",
-                "Queries": summary[
-                    "n_queries"
-                ],
-                "Initial candidates": summary[
-                    "n_candidate_rows_before"
-                ],
-                "Retained candidates": summary[
-                    "n_candidate_rows_after"
-                ],
-                "Reduction (%)": summary[
-                    "candidate_reduction_pct"
-                ],
-                "Top-1 (%)": summary[
-                    "top1_after_pct"
-                ],
-                "Top-5 (%)": summary[
-                    "top5_after_pct"
-                ],
-                "Top-10 (%)": summary[
-                    "top10_after_pct"
-                ],
-                "True retained (%)": summary[
-                    "true_retention_pct"
-                ],
-                "False negatives": summary[
-                    "false_negatives"
-                ],
-            }
-        )
-
-        parameter_rows.append(
-            {
-                "Dataset": dataset,
-                "Selected method": (
-                    "RT-aware guarded soft rerank"
-                ),
-                "T (s)": config[
-                    "threshold_sec"
-                ],
-                "g": config["guard_k"],
-                "tau (s)": config["tau"],
-                "alpha": config["alpha"],
-                "Candidate retention rule": (
-                    "|Delta RT| <= T or "
-                    "MS-FINDER rank <= g"
-                ),
-                "Reranking score": (
-                    "MS-FINDER rank + "
-                    "alpha * |Delta RT| / tau"
-                ),
-                "Tie-breaking": (
-                    "MS-FINDER rank, then "
-                    "MS-FINDER score"
-                ),
-                "Queries": summary[
-                    "n_queries"
-                ],
-                "Candidates before": summary[
-                    "n_candidate_rows_before"
-                ],
-                "Candidates after": summary[
-                    "n_candidate_rows_after"
-                ],
-                "Reduction (%)": summary[
-                    "candidate_reduction_pct"
-                ],
-                "True retained (%)": summary[
-                    "true_retention_pct"
-                ],
-                "Top-1 (%)": summary[
-                    "top1_after_pct"
-                ],
-                "Top-5 (%)": summary[
-                    "top5_after_pct"
-                ],
-                "Top-10 (%)": summary[
-                    "top10_after_pct"
-                ],
-            }
-        )
-
-        print()
-        print(f"[{dataset}]")
-        print(
-            "candidates:",
-            summary[
-                "n_candidate_rows_before"
-            ],
-            "->",
-            summary[
-                "n_candidate_rows_after"
-            ],
-        )
-        print(
-            "reduction:",
-            f"{summary['candidate_reduction_pct']:.6f}%",
-        )
-        print(
-            "true retained:",
-            f"{summary['true_retention_pct']:.6f}%",
-        )
-        print(
-            "Top-1/5/10:",
-            f"{summary['top1_after_pct']:.6f}",
-            f"{summary['top5_after_pct']:.6f}",
-            f"{summary['top10_after_pct']:.6f}",
-        )
-        print(
-            "false negatives:",
-            summary["false_negatives"],
-        )
-
-    selected = pd.DataFrame(
-        selected_rows
-    )
-
-    main_table = pd.DataFrame(
-        main_table_rows
-    )
-
-    parameters = pd.DataFrame(
-        parameter_rows
-    )
-
-    selected.to_csv(
-        out_dir
-        / "candidate_filtering_selected_summary.csv",
-        index=False,
-    )
-
-    main_table.to_csv(
-        out_dir
-        / "Table_3_candidate_filtering_main.csv",
-        index=False,
-    )
-
-    parameters.to_csv(
-        out_dir
-        / "Table_S22_candidate_filtering_parameters.csv",
-        index=False,
-    )
-
-    print()
-    print("=" * 88)
-    print("FINAL TABLE")
-    print("=" * 88)
-    print(
-        main_table.to_string(index=False)
-    )
-
-    print()
-    print(
-        "PASS: final candidate-filtering "
-        "results reproduced."
-    )
-    print("[SAVE]", out_dir)
+        summaries.append(summary)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        raise SystemExit(main())
+    except (FileNotFoundError, KeyError, ValueError) as error:
+        print(f"[ERROR] {error}", file=sys.stderr)
+        raise SystemExit(2) from error

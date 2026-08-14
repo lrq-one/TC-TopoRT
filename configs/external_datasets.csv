@@ -1,0 +1,12 @@
+dataset_name,n,group,used_for
+FEM_short_73,73,external10,transfer_vs_scratch_all10
+UniToyama_Atlantis_143,143,external10,transfer_vs_scratch_all10
+FEM_long_412,412,external10,transfer_vs_scratch_all10
+Eawag_XBridgeC18_364,364,external10,transfer_vs_scratch_all10
+LIFE_old_194,194,external10,transfer_vs_scratch_all10
+MTBLS87_147,147,external10,transfer_vs_scratch_all10
+LIFE_new_184,184,external10,transfer_vs_scratch_all10
+Cao_HILIC_116,116,external10,transfer_vs_scratch_all10
+IPB_Halle_82,82,external10,transfer_vs_scratch_all10
+FEM_lipids_72,72,external10,transfer_vs_scratch_all10
+

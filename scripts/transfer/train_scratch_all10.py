@@ -109,8 +109,8 @@ def complex_collate_fn(batch):
 
 class ExternalTargetDataset(Dataset):
     """
-    SMRTComplexDataset 里 y 是 dummy RT。
-    这个 wrapper 在取样时把 y 改成 external RT。
+    SMRTComplexDataset stores a placeholder target. This wrapper replaces it
+    with the external-dataset RT when an item is loaded.
     """
     def __init__(self, base_dataset, targets):
         self.base_dataset = base_dataset

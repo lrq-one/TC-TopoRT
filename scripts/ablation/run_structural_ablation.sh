@@ -6,7 +6,6 @@ set -euo pipefail
 #
 # Usage:
 #   bash scripts/ablation/run_structural_ablation.sh no2cell
-#   bash scripts/ablation/run_structural_ablation.sh cwn0
 #
 # Optional environment variables:
 #   PYTHON=python
@@ -29,32 +28,22 @@ set -euo pipefail
 
 MODE="${1:-}"
 
-case "${MODE}" in
-    no2cell)
-        MAX_RING_SIZE=2
-        CWN_LAYERS=6
-        CACHE_TAG="no2cell"
-        DESCRIPTION="without explicit ring 2-cells"
-        ;;
-    cwn0)
-        MAX_RING_SIZE=6
-        CWN_LAYERS=0
-        CACHE_TAG="ring6"
-        DESCRIPTION="without CWN message passing"
-        ;;
-    *)
-        cat <<'USAGE'
+if [[ "${MODE}" != "no2cell" ]]; then
+    cat <<'USAGE'
 Usage:
   bash scripts/ablation/run_structural_ablation.sh no2cell
-  bash scripts/ablation/run_structural_ablation.sh cwn0
 
 Modes:
-  no2cell   Set max_ring_size=2 and cwn_layers=6.
-  cwn0      Set max_ring_size=6 and cwn_layers=0.
+  no2cell   Remove explicit higher-order ring 2-cells while retaining the
+            conventional atom, bond, and global ring descriptors.
 USAGE
-        exit 2
-        ;;
-esac
+    exit 2
+fi
+
+MAX_RING_SIZE=2
+CWN_LAYERS=6
+CACHE_TAG="no2cell"
+DESCRIPTION="without explicit higher-order ring 2-cells"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"

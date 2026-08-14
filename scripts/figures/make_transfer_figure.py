@@ -158,12 +158,11 @@ def main():
 
     ax.set_xlabel("MAE improvement from transfer learning (s)", fontsize=9.2)
 
-    # 先给一个紧凑范围，后面根据文字真实宽度自动扩。
+    # Start compact, then expand from the rendered label extents.
     ax.set_xlim(-5.8, 35.6)
     ax.set_xticks([-5, 0, 5, 10, 15, 20, 25, 30, 35])
 
-    # 数值标注全部放柱子外面。
-    # 关键：先创建文本，再自动扩 xlim，保证文本和左右边框有空隙。
+    # Put values outside bars, then adjust limits to retain a visible margin.
     texts = []
     for yi, v in zip(y, values):
         txt = f"{v:+.3f}"
@@ -198,7 +197,7 @@ def main():
 
         texts.append(t)
 
-    # 自动扩展左右边界，保证 -3.831 和左边框、+31.940 和右边框都有空隙。
+    # Expand both boundaries using the actual rendered text widths.
     expand_xlim_to_fit_text(ax, texts, pad_px=12, max_iter=8)
 
     for spine in ax.spines.values():

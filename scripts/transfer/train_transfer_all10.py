@@ -113,8 +113,8 @@ def complex_collate_fn(batch):
 
 class ExternalTargetDataset(Dataset):
     """
-    SMRTComplexDataset 里 y 是 dummy RT。
-    这个 wrapper 在取样时把 y 改成 external RT。
+    SMRTComplexDataset stores a placeholder target. This wrapper replaces it
+    with the external-dataset RT when an item is loaded.
     """
     def __init__(self, base_dataset, targets):
         self.base_dataset = base_dataset
@@ -985,7 +985,7 @@ def build_bank(df: pd.DataFrame, source_folds):
     T = bank[matched_taut].astype(float).values
     P = 0.5 * (O + T)
 
-    # 固定候选，不按数据集手动更换
+    # Use one fixed candidate set rather than dataset-specific manual selection.
     bank["cand_origin_mean"] = O.mean(axis=1)
     bank["cand_taut_mean"] = T.mean(axis=1)
     bank["cand_pair_mean"] = P.mean(axis=1)
@@ -998,7 +998,7 @@ def build_bank(df: pd.DataFrame, source_folds):
     bank["cand_taut_trimmean"] = trim_mean(T, axis=1)
     bank["cand_pair_trimmean"] = trim_mean(P, axis=1)
 
-    # view disagreement 有时候说明 taut view 不可靠，但这里不作为学习特征，只保存诊断
+    # View disagreement is retained for diagnostics, not used as a learned feature here.
     bank["diag_abs_origin_taut_delta"] = np.abs(bank["cand_origin_mean"] - bank["cand_taut_mean"])
 
     cand_cols = [

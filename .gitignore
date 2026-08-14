@@ -1,90 +1,101 @@
-*.pyc
-*.txt
-*.log
-*.json
-*.csv
-*.pt
-*.pkl
+# Python and editor state
 __pycache__/
-# local archives / legacy backups
-_archive_legacy/
+*.py[cod]
+*.swp
+.DS_Store
+.idea/
+.vscode/
 
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
+# Environments and local configuration
+.env
+.venv/
+venv/
+env/
+conda-env/
 
-# logs
-*.log
-logs/
-gwn/logs/
-
-# model checkpoints and large binaries
+# Model files and serialized caches
 *.pth
 *.pt
 *.ckpt
-model_dict/
-
-# generated result folders / caches
-gwn/results_OOF_DualView_Stack_*/
-gwn/smrt_cwn_oof_*/
-gwn/smrt_cwn_data_*/
-gwn/smrt_topocellrt_*/
-gwn/paper_final_results_TCDV_TopoRT_*.tar.gz
-
-# generated tautomer outputs
-gwn/data_taut_strict_generated/
-
-# Local external datasets for transfer/filtering experiments
-gwn/external_data/
-
-# ===== TCDV-TopoRT local experiment artifacts =====
-/ablations/
-/gwn/results_*/
-/gwn/final_*/
-/gwn/paper_analysis*/
-/gwn/*_work*/
-/gwn/h2_work*/
-/gwn/dualview_work*/
-/gwn/smrt_*_train/
-/gwn/smrt_*_test/
-/gwn/experiments_transfer_effectiveness/results_*/
-/gwn/experiments_transfer_effectiveness/logs/
-/gwn/experiments_transfer_effectiveness/fixed_raw_autoselect_table2/results_*/
-/gwn/experiments_transfer_effectiveness/fixed_raw_autoselect_table2/*.csv
-
-# model/checkpoint/cache
-*.pth
-*.pt
-*.ckpt
-*.npy
-*.npz
 *.pkl
 *.joblib
-*.log
-__pycache__/
-*.pyc
+*.npy
+*.npz
+model_dict/
 
-# local analysis outputs
+# Archives, logs, and generated figures
+*.zip
+*.tar
+*.tar.gz
+*.log
+logs/
 *.tmp
 *.bak
+*.bak_*
+*.out
 
-# Submission public-data whitelist
-
-# Generated experiment outputs
+# All generated experiment outputs belong here.
 artifacts/
 
-# Public candidate-filtering inputs
-!data/candidate_filtering/
-!data/candidate_filtering/*.csv
+# Local-only research work and archive preparation
+figshare_prepare/
+reviewer2_work/
+scripts/reviewer/
+gwn/reviewer_response/
+gwn/diagnostics/
+external_baselines/
+_archive_legacy/
+cleanup_backups/
+_repo_audit/
+_submission_plan/
 
-# Public ablation source table
-!data/ablation/*.csv
+# Historical local experiment trees superseded by the public scripts/ entries.
+ablations/
+gwn/configs/
+gwn/experiments_candidate_filtering/
+gwn/experiments_transfer_effectiveness/
+gwn/external_splits/
+gwn/paper_final_results/
 
-# Public reproducibility source tables
-!data/
-!data/ablation/
-!data/ablation/source_ablation_delta_final.csv
+# One-off local audit and rerun helpers (preserved locally, never published).
+README_MAJOR3.md
+baseline_repo_inventory.txt
+major1_*.txt
+r1_*.txt
+rerun_experiment2_fixed.sh
+run_experiments_1_2_stage1.sh
+run_major3_matched_gine_seed5.sh
+run_tautomer_three_experiments_preflight.sh
 
-# Public environment specification
-!requirements.txt
+# Source and derived datasets are intentionally not versioned.  Keep the
+# explanatory README and small configuration tables tracked explicitly.
+data/local/
+data/candidate_filtering/
+data/ablation/
+gwn/data/
+gwn/data_taut_strict_origin_order/
+gwn/data_taut_strict_generated/
+gwn/external_data/
+
+# Historical output locations retained for local compatibility
+gwn/results_*/
+gwn/final_*/
+gwn/paper_analysis*/
+gwn/*_work/
+gwn/h2_work/
+gwn/dualview_work/
+gwn/smrt_*_train/
+gwn/smrt_*_test/
+gwn/experiments_transfer_effectiveness/results_*/
+gwn/experiments_transfer_effectiveness/logs/
+gwn/experiments_transfer_effectiveness/fixed_raw_autoselect_table2/results_*/
+gwn/experiments_candidate_filtering/msfinder_queries/
+gwn/experiments_candidate_filtering/filtering_parameter_sensitivity_audit/
+
+# Generated paper assets are not part of the public source repository.
+manuscript/
+manuscript_figures_final/
+manuscript_figures_jcim/
+paper_results_*/
+gwn/figure_assets/
+gwn/final_paper_tables/

@@ -1,182 +1,185 @@
 # TC-TopoRT
 
-TC-TopoRT is a topology-aware framework for small-molecule retention-time prediction and RT-guided candidate prioritization.
+TC-TopoRT is a topology-aware cell-complex neural network for LC-MS retention
+time prediction and RT-assisted metabolite candidate filtering. The model uses
+paired dataset-provided and conservatively tautomer-standardized molecular
+views, explicit ring 2-cells, cellular message passing, and leakage-free
+out-of-fold (OOF) fusion.
 
-It combines:
+The paired views are representation controls. They do not model physical
+solution-phase tautomer populations, pH-specific microspecies, or ESI tautomer
+equilibria.
 
-- paired original and strict tautomer-canonical molecular views;
-- ring-aware cell complexes with atom, bond, and ring cells;
-- topology-aware CWN message passing;
-- leakage-free out-of-fold prediction-level fusion;
-- external transfer learning;
-- RT-guided candidate filtering and soft reranking.
+## Repository contents
 
-## Reported results
+- `gwn/mp/` and `gwn/net/`: cell-complex construction and TC-TopoRT model code.
+- `gwn/train_oof_dualview_stack.py`: paired-view five-fold OOF training and Huber fusion.
+- `configs/`: final SMRT, external-transfer, and candidate-filtering configurations.
+- `scripts/data/`: paired-view and external-data preparation.
+- `scripts/training/`: one-seed and five-seed SMRT entry points.
+- `scripts/ablation/`: No2Cell and parameter-matched atom-bond GINE controls.
+- `scripts/transfer/`: ten-dataset transfer-versus-scratch experiment.
+- `scripts/filtering/`: final independently calibrated candidate filter.
+- `scripts/analysis/` and `scripts/figures/`: final-paper and SI analyses.
+- `scripts/tests/`: dataset-free static, smoke, and filtering-rule checks.
+- `docs/`: detailed reproduction and supplementary-analysis notes.
 
-### SMRT prediction
+## Data and archived outputs
 
-- TC-TopoRT-S: **25.055 ± 0.039 s MAE**
-- TC-TopoRT-E, five-seed ensemble: **24.920 s MAE**
-- Seeds: `1, 5, 79, 123, 256`
+GitHub contains code, configurations, environment definitions, and reproduction
+instructions. It intentionally excludes checkpoints, graph caches, large source
+tables, prediction dumps, candidate-level outputs, and generated figures.
 
-The conventional atom-bond GNN baseline obtained **28.252 s MAE**, which is 3.240 s higher than TC-TopoRT seed 5.
+The original METLIN SMRT benchmark source is available at
+[DOI 10.6084/m9.figshare.8038913](https://doi.org/10.6084/m9.figshare.8038913).
+This is the original source benchmark, not the authors' TC-TopoRT archive.
+External datasets remain subject to their original sources and terms.
 
-### External transfer learning
+The separate author Figshare archive contains trained models, final predictions,
+candidate lists, candidate-level filtering outputs, development-calibration
+records, frozen thresholds, final configuration snapshots, and a checksum
+manifest. Its DOI will be added after the deposit is finalized; no DOI is
+invented here. See [data/README.md](data/README.md) for local placement.
 
-Across ten external datasets:
+## Environment
 
-- transfer learning achieved lower MAE on **8/10 datasets**;
-- mean MAE improvement: **9.164 s**;
-- median MAE improvement: **3.677 s**.
+The paper workflow used Python 3.10, PyTorch 2.3.0, CUDA 12.1, PyTorch
+Geometric, RDKit, and an NVIDIA RTX 3090 with 24 GB memory.
 
-### Candidate filtering
-
-| Dataset | Reduction | True retained | Top-1 | Top-5 | Top-10 | FN |
-|---|---:|---:|---:|---:|---:|---:|
-| MetaboBase | 69.14% | 93.33% | 55.56% | 82.22% | 88.89% | 3 |
-| RIKEN-PlaSMA | 46.23% | 97.65% | 54.12% | 77.65% | 89.41% | 2 |
-
-## Repository structure
-
-~~~text
-scripts/
-├── training/    SMRT training entries
-├── data/        paired-view construction and validation
-├── ablation/    structural and atom-bond GNN ablations
-├── transfer/    external transfer and scratch workflows
-├── filtering/   candidate filtering and sensitivity analysis
-└── figures/     public figure-generation entries
-
-data/
-├── candidate_filtering/
-└── ablation/
-
-artifacts/
-├── cache/
-├── results/
-└── figures/
-~~~
-
-Generated outputs under `artifacts/` are excluded from Git.
-
-## Installation
-
-Using Conda:
-
-~~~bash
+```bash
 conda env create -f environment.yml
 conda activate tc-toport
-~~~
+```
 
-Using pip:
+A pip installation can use `pip install -r requirements.txt` in a clean Python
+3.10 environment. Install the `torch-scatter` and `torch-sparse` binary wheels
+that match the selected PyTorch/CUDA build; PyG extension wheels are not
+interchangeable across arbitrary PyTorch/CUDA versions. CPU-only validation is
+possible, but full training is computationally expensive.
 
-~~~bash
-python -m pip install -r requirements.txt
-~~~
+## Quick validation
 
-PyTorch and PyTorch Geometric may need installation commands compatible with the local CUDA version.
+These checks do not require the full SMRT dataset:
 
-## Reproduction
+```bash
+bash scripts/tests/run_static_checks.sh
+python scripts/tests/smoke_test.py
+python scripts/tests/test_candidate_filtering.py
+```
 
-Run all commands from the repository root.
+## SMRT benchmark
 
-### 1. Build and validate paired SMRT views
+Place the four paired CSVs as described in `data/README.md`. The benchmark uses
+70,182 training compounds, 7,798 independent test compounds, `RT > 300 s`, and
+paper seeds `1 5 79 123 256`.
 
-~~~bash
-bash scripts/data/rebuild_strict_tautomer_views.sh
-bash scripts/data/validate_smrt_paired_views.sh
-~~~
-
-Expected validation:
-
-~~~text
-Train: 70,182
-Test: 7,798
-Train changed: 37,724
-Test changed: 4,242
-Formula preserved: all
-Invalid SMILES: 0
-~~~
-
-### 2. Train TC-TopoRT
-
-Single seed:
-
-~~~bash
-bash scripts/training/run_smrt_single_seed.sh 5
-~~~
-
-Five seeds:
-
-~~~bash
+```bash
+SEED=1 bash scripts/training/run_smrt_single_seed.sh
 bash scripts/training/run_smrt_five_seeds.sh
-~~~
 
-Outputs are written under `artifacts/results/smrt/`.
+python scripts/analysis/summarize_smrt_results.py \
+  --prediction 1=artifacts/results/smrt/seed1/test_predictions.csv \
+  --prediction 5=artifacts/results/smrt/seed5/test_predictions.csv \
+  --prediction 79=artifacts/results/smrt/seed79/test_predictions.csv \
+  --prediction 123=artifacts/results/smrt/seed123/test_predictions.csv \
+  --prediction 256=artifacts/results/smrt/seed256/test_predictions.csv \
+  --verify-paper-results
+```
 
-### 3. Structural ablations
+The final five-run MAE is `25.055090 ± 0.039094 s`; averaging the five final
+test predictions gives approximately `24.920 s` MAE.
 
-~~~bash
+## Dual-view and structural controls
+
+Final controls comprise Original-only, tautomer-standardized-only, O+O, T+T,
+same-seed O+T arithmetic averaging, the final O+T OOF Huber fusion, shuffled
+pairing, No2Cell, and the parameter-matched atom-bond GINE. No2Cell removes
+explicit higher-order ring 2-cells while retaining conventional atom, bond, and
+global ring descriptors.
+
+```bash
 bash scripts/ablation/run_structural_ablation.sh no2cell
-bash scripts/ablation/run_structural_ablation.sh cwn0
-~~~
-
-### 4. Atom-bond GNN baseline
-
-~~~bash
 bash scripts/ablation/run_atom_bond_gnn.sh
-~~~
+```
 
-### 5. External transfer and scratch experiments
+Independent-model fusion is the major contributor; tautomer standardization
+provides a smaller representation-robustness contribution. Supplied per-seed
+control tables can be checked with `build_dualview_ablation.py` and
+`collect_structural_ablation.py`; see [docs/reproduction.md](docs/reproduction.md).
 
-~~~bash
-python scripts/transfer/train_scratch_all10.py
-python scripts/transfer/train_transfer_all10.py
-~~~
+## External transfer
 
-The combined comparison table is written to:
+The final experiment compares SMRT-pretrained transfer with random initialization
+on ten datasets:
 
-~~~text
-artifacts/results/external_transfer/Table_8_transfer_learning_effectiveness.csv
-~~~
+```bash
+python scripts/transfer/train_transfer_all10.py --dry_run 1
+python scripts/transfer/train_scratch_all10.py --dry_run 1
+```
 
-### 6. Candidate filtering
+Remove `--dry_run 1` for training after preparing inputs and source checkpoints.
+Transfer is better on 8/10 datasets; mean and median MAE improvements are 9.164 s
+and 3.677 s. Scratch is better on Cao-HILIC and IPB-Halle; MTBLS87 retains a
+small positive transfer benefit.
 
-~~~bash
-python scripts/filtering/run_candidate_filtering.py
-python scripts/filtering/run_filtering_sensitivity.py
-~~~
+## Candidate filtering
 
-### 7. Generate figures
+For predictor `m`, the threshold is frozen on an independent development set:
 
-~~~bash
-python scripts/figures/make_candidate_filtering_figure.py
-python scripts/figures/make_transfer_figure.py
-python scripts/figures/make_ablation_figure.py
-python scripts/figures/make_smrt_figures.py
-~~~
+```text
+T_m = 3 × MAE_dev,m
+```
 
-The SMRT figure entry expects:
+Within each candidate dataset, all four predictors use the same fixed 30
+development queries and shared experimental RT labels. Final evaluation queries
+are excluded from calibration. A candidate is retained when its prediction is
+missing or `|experimental RT - predicted RT| <= T_m`; retained candidates keep
+their original MS-FINDER order. There is no rank guard, soft reranking, `g`,
+`tau`, `alpha`, hybrid score, or final-test threshold tuning.
 
-~~~text
-artifacts/results/smrt/seed5/test_predictions.csv
-~~~
+TC-TopoRT uses `T = 174.868 s` for MetaboBase and `T = 80.977 s` for
+RIKEN-PlaSMA. The final evaluation denominators are 45 and 85 queries,
+respectively, restricted to evaluable queries whose true candidate is present in
+the initial MS-FINDER list.
 
-A different result directory can be supplied with:
+```bash
+python scripts/filtering/run_candidate_filtering.py \
+  --dataset metabobase \
+  --input data/local/candidate_filtering/metabobase_candidate_predictions.csv
 
-~~~bash
-python scripts/figures/make_smrt_figures.py \
-  --result_dir artifacts/results/smrt/<result-directory>
-~~~
+python scripts/filtering/run_candidate_filtering.py \
+  --dataset riken_plasma \
+  --input data/local/candidate_filtering/riken_plasma_candidate_predictions.csv
+```
 
-## Leakage control
+If the frozen inputs are absent, the script exits with an explicit Figshare/local
+placement message and never fabricates an output.
 
-The paired molecular views share identical labels and splits. Prediction-level fusion is fitted from out-of-fold training predictions. Independent test labels are not used for model selection, stacker fitting, calibration, or filtering-parameter optimization.
+The manuscript reports the following RIKEN-PlaSMA reference result for the
+final protocol: 84/85 true candidates retained (98.82%, FN = 1), Top-1 = 45/85,
+Top-5 = 63/85, and Top-10 = 72/85. These values are the manuscript-reported
+reference results for the final evaluation protocol. Exact numerical
+reproduction requires the corresponding candidate-level inputs and calibration
+records used for that evaluation. The frozen candidate-filtering inputs and
+calibration records are provided in the author Figshare archive.
 
-The candidate-filtering comparisons use consistent candidate lists, query sets, experimental RT values, original MS-FINDER ranks, filtering rules, reranking definitions, and evaluation metrics.
+## Supplementary analyses
 
-## Data policy
+See [docs/supplementary_analyses.md](docs/supplementary_analyses.md) for the
+early-RT scope audit, tautomer-standardization collision audit, overlapping ring
+subgroups, matched Full-versus-No2Cell RIKEN analysis, same-formula pairwise
+discrimination, and the illustrative Norharman case.
 
-The public candidate-filtering CSV files and the compact ablation source table are included under `data/`.
+## Reproducibility
 
-Large caches, checkpoints, weights, logs, generated predictions, tables, and figures remain under `artifacts/` and are not committed.
+[docs/reproduction.md](docs/reproduction.md) maps each paper result to its
+command, required inputs, generated output, and archive availability. Code
+regenerates analyses when the required inputs are supplied; the separate archive
+provides the frozen research artifacts listed in its manifest so that GitHub
+does not duplicate large data or trained models.
+
+## Citation and license
+
+Citation metadata are provided in [CITATION.cff](CITATION.cff). The manuscript
+DOI is omitted until assigned. Repository code is MIT licensed. Third-party data
+retain their original licenses and are not relicensed by this repository.
