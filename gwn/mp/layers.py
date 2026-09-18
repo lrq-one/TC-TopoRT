@@ -13,64 +13,45 @@ from abc import ABC, abstractmethod
 
 import torch.nn.functional as F
 class IntraCellularAttention(nn.Module):
-    def __init__(self, hidden_dim, num_sources, dropout=0.0): # [新增] dropout 参数默认为 0.1
+    def __init__(self, hidden_dim, num_sources, dropout=0.0):
         super(IntraCellularAttention, self).__init__()
         self.num_sources = num_sources
         
-        # 评分网络
         self.score_net = nn.Sequential(
             nn.Linear(hidden_dim * num_sources, hidden_dim // 2),
             nn.GELU(),
             nn.Linear(hidden_dim // 2, num_sources)
         )
         
-        # 融合网络
         self.fusion_net = nn.Sequential(
             nn.Linear(hidden_dim * num_sources, hidden_dim),
             nn.BatchNorm1d(hidden_dim),
             nn.GELU()
         )
-        
-        # [终极武器]：注意力机制的专属 Dropout
         self.attn_dropout = nn.Dropout(dropout) 
 
     def forward(self, source_list):
-        """
-        source_list: 包含各个方向消息的列表，每个 tensor shape 为 [N, hidden_dim]
-        """
-        # 1. 自动检测全零特征并生成 Mask
+
         masks = []
         for feat in source_list:
-            # mask 为 1 表示有信号，为 0 表示是填充的全零占位符
             mask = (feat.abs().sum(dim=-1, keepdim=True) > 1e-6).float()
             masks.append(mask)
         combined_mask = torch.cat(masks, dim=-1) # [N, num_sources]
 
-        # 2. 计算原始 logits (未归一化的得分)
         concat_feat = torch.cat(source_list, dim=-1)
         logits = self.score_net(concat_feat) # [N, num_sources]
         
-        # 3. 强制屏蔽：将全零特征对应的 logits 设为极小值 (-1e9)
         combined_mask[:, 0] = 1.0 
         logits = logits.masked_fill(combined_mask == 0, -1e9)
-        
-        # ==========================================
-        # 4. [修复]：Attention Dropout 施加在 logits 上（softmax 之前）
-        # 这样 softmax 后权重之和仍然为 1，训练/推理行为一致。
-        # 之前放在 softmax 之后会破坏归一化，导致训练不稳定！
-        # ==========================================
         logits = self.attn_dropout(logits)
         
-        # 5. 计算注意力分数
         attn_scores = F.softmax(logits, dim=-1) # [N, num_sources]
         
-        # 6. 动态加权
         weighted_sources = []
         for i, feat in enumerate(source_list):
             score = attn_scores[:, i].unsqueeze(1) # [N, 1]
             weighted_sources.append(feat * score)
             
-        # 7. 融合输出
         out = self.fusion_net(torch.cat(weighted_sources, dim=-1))
         return out
 class DummyCochainMessagePassing(CochainMessagePassing):
@@ -164,12 +145,7 @@ class CINCochainConv(CochainMessagePassing):
         x = torch.cat([down_x_j, down_attr], dim=-1)
         return self.msg_down_nn(x)
 
-"""
-原理：它利用了单纯复形（Cell Complex）中的“上邻接”（Upper Adjacency）和“下邻接”（Lower Adjacency）来进行消息传递。
-输入：cochain_params（包含节点、边、环的特征和邻接矩阵）。
-输出：更新后的特征向量列表 [v_out, e_out, c_out]
-"""
-class CINConv(torch.nn.Module): #这是基础版的 CWN 卷积层。
+class CINConv(torch.nn.Module): 
     def __init__(self, up_msg_size: int, down_msg_size: int,
                  msg_up_nn: Callable, msg_down_nn: Callable, update_nn: Callable,
                  eps: float = 0., train_eps: bool = False, max_dim: int = 2):
@@ -308,7 +284,6 @@ class CINppCochainConv(SparseCINCochainConv):
     
 
     def forward(self, cochain: CochainMessagePassingParams):
-        # 1. 传播：得到纯粹的邻居聚合信息
         out_up, out_down, out_boundaries = self.propagate(
             cochain.up_index, cochain.down_index,
             cochain.boundary_index, x=cochain.x,
@@ -317,25 +292,17 @@ class CINppCochainConv(SparseCINCochainConv):
             boundary_attr=cochain.kwargs['boundary_attr']
         )
 
-        # [二次核心修复]：提取纯净消息掩码！
-        # 如果某个方向不存在（如原子的 down），propagate 返回的全是 0。
-        # 必须在这里记录掩码，因为紧接着后面的 update_nn 包含 Bias 和 BatchNorm，会把全 0 向量变成非 0！
-        # 只有强行乘回 0，你刚刚在 IntraCellularAttention 里写的那些动态掩码逻辑才可能真正生效！
         mask_up = (out_up.abs().sum(dim=-1, keepdim=True) > 1e-6).float()
         mask_down = (out_down.abs().sum(dim=-1, keepdim=True) > 1e-6).float()
         mask_bounds = (out_boundaries.abs().sum(dim=-1, keepdim=True) > 1e-6).float()
 
-        # 2. 映射：对各个方向的纯邻居消息进行非线性变换
         out_up = self.update_up_nn(out_up) * mask_up
         out_down = self.update_down_nn(out_down) * mask_down
         out_boundaries = self.update_boundaries_nn(out_boundaries) * mask_bounds
 
-        # 3. 统一融合：无论什么维度，都让注意力模块去平衡“自身”与“三个方向的邻居”
-        # 即使某个方向没有消息（如原子没有 Down 方向），propagate 也会返回零张量，注意力会自动处理
         sources = [cochain.x, out_up, out_down, out_boundaries]
         out = self.combine_nn(sources)
 
-        # 4. 全局残差：只在这里保留一个干净的特征跳连
         return out + cochain.x
 
 class Catter(torch.nn.Module):
@@ -345,10 +312,6 @@ class Catter(torch.nn.Module):
     def forward(self, x):
         return torch.cat(x, dim=-1)
     
-"""
-改进版。为了计算效率，它只考虑了特定的消息传递路径（例如：只从边界和上层邻居接收消息），使得计算更稀疏、更快速。
-适用场景：大规模分子图或需要高效计算的场景。
-"""   
 class SparseCINConv(torch.nn.Module):
     """A cellular version of GIN which performs message passing from  cellular upper
     neighbors and boundaries, but not from lower neighbors (hence why "Sparse")
@@ -422,10 +385,8 @@ class SparseCINConv(torch.nn.Module):
                 out.append(self.mp_levels[dim].forward(cochain_params[dim]))
         return out
 
-class CINppConv(torch.nn.Module): # <--- [修改]：不再继承 SparseCINConv，直接继承 nn.Module
-    """
-    增强版。考虑了 Up, Down, Boundary 全方向消息传递，表达能力最强。
-    """
+class CINppConv(torch.nn.Module): 
+
     def __init__(self, up_msg_size: int, down_msg_size: int, boundary_msg_size: Optional[int],
                  passed_msg_up_nn: Optional[Callable], passed_msg_down_nn: Optional[Callable],
                  passed_msg_boundaries_nn: Optional[Callable],
@@ -435,7 +396,6 @@ class CINppConv(torch.nn.Module): # <--- [修改]：不再继承 SparseCINConv�
                  eps: float = 0., train_eps: bool = False, max_dim: int = 2,
                  graph_norm=BN, use_coboundaries=False, **kwargs):
         
-        # === [核心修复]：直接初始化自身，避免调用冗余的父类初始化 ===
         super(CINppConv, self).__init__()
         self.max_dim = max_dim
         self.mp_levels = torch.nn.ModuleList()
@@ -508,7 +468,6 @@ class CINppConv(torch.nn.Module): # <--- [修改]：不再继承 SparseCINConv�
                 train_eps=train_eps)
             self.mp_levels.append(mp)
 
-    # === [核心修复]：补上原本依赖父类的 forward 函数 ===
     def forward(self, *cochain_params: CochainMessagePassingParams, start_to_process=0):
         assert len(cochain_params) <= self.max_dim+1
 
@@ -576,9 +535,7 @@ class InitReduceConv(torch.nn.Module):
         self.reduce = reduce
 
     def forward(self, boundary_x, boundary_index):
-        # === [核心修复]：防御性检查，处理无环分子 ===
         if boundary_index is None or (isinstance(boundary_index, torch.Tensor) and boundary_index.numel() == 0):
-            # 如果没有环结构，直接返回一个与特征维度匹配的空张量
             return torch.zeros((0, boundary_x.size(-1)), device=boundary_x.device)
         features = boundary_x.index_select(0, boundary_index[0])
         out_size = boundary_index[1, :].max() + 1
@@ -645,11 +602,8 @@ class AbstractEmbedVEWithReduce(torch.nn.Module, ABC):
         reset(self.e_embed_layer)
 
     
-class EmbedVEWithReduce(AbstractEmbedVEWithReduce): #将原始数据（Raw Data）转换为可训练的向量（Embeddings），是模型的“入口”。
-    """
-    用于通用的图数据。将节点特征（通常是整数索引）通过 torch.nn.Embedding 转化为向量。
-    重要机制 (init_reduce)：它还会自动初始化**边（Edge）和环（Cell）**的特征。比如，一条边的初始特征可以是它两个端点特征的相加；一个环的特征可以是围成它的边的特征相加。
-    """
+class EmbedVEWithReduce(AbstractEmbedVEWithReduce): 
+
     def __init__(self,
                  v_embed_layer: torch.nn.Embedding,
                  e_embed_layer: Optional[torch.nn.Embedding],
@@ -669,59 +623,6 @@ class EmbedVEWithReduce(AbstractEmbedVEWithReduce): #将原始数据（Raw Data�
         assert e_params.x.size(1) == 1
         # The embedding layer expects integers so we convert the tensor to int.
         return e_params.x.squeeze(1).to(dtype=torch.long)
-
-"""
-OGBEmbedVEWithReduce:
-这就是你需要用的！
-它是专门为 OGB 分子数据集设计的。
-它使用了 OGB 官方提供的 AtomEncoder 和 BondEncoder，能很好地处理原子的化学属性（原子序数、手性等）和化学键属性。
-在双塔模型中的作用：这将是你 CWN 分支的第一层，负责把 SMILES 转换来的图数据变成向量。
-总结：
-这正是你要找的代码。重点关注 OGBEmbedVEWithReduce（入口）和 CINConv / CINppConv（中间层），利用它们搭建你的拓扑特征提取分支。
-from models.cwn import CINConv, OGBEmbedVEWithReduce, InitReduceConv
-# 假设上面的代码保存在 models/cwn.py 中
-
-class CWNBranch(torch.nn.Module):
-    def __init__(self, hidden_dim, num_layers):
-        super().__init__()
-        
-        # 1. 嵌入层：处理原子和键的特征
-        self.embed_layer = OGBEmbedVEWithReduce(
-            v_embed_layer=AtomEncoder(hidden_dim),
-            e_embed_layer=BondEncoder(hidden_dim),
-            init_reduce=InitReduceConv(reduce='add')
-        )
-        
-        # 2. 卷积层：提取拓扑特征
-        self.convs = torch.nn.ModuleList()
-        for _ in range(num_layers):
-            self.convs.append(
-                CINConv(
-                    up_msg_size=hidden_dim, 
-                    down_msg_size=hidden_dim,
-                    msg_up_nn=..., # 这里需要定义一些 MLP
-                    msg_down_nn=...,
-                    update_nn=...,
-                    hidden=hidden_dim
-                )
-            )
-            
-    def forward(self, *cochain_params):
-        # 1. 嵌入
-        xs = self.embed_layer(*cochain_params)
-        
-        # 2. 卷积
-        for conv in self.convs:
-            # 更新 cochain_params 中的 x
-            for i in range(len(xs)):
-                cochain_params[i].x = xs[i]
-            xs = conv(*cochain_params)
-            
-        # 3. Readout (池化)
-        # 通常取图级别的特征（例如第0维节点的平均值）
-        graph_feature = global_mean_pool(xs[0], batch_index)
-        return graph_feature
-"""
 
 class OGBEmbedVEWithReduce(AbstractEmbedVEWithReduce):
     
