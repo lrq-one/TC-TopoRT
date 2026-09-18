@@ -11,7 +11,7 @@ from typing import List
 
 class Cochain(object):
     def __init__(self, dim: int, x: Tensor = None, upper_index: Adj = None, lower_index: Adj = None,
-                 shared_boundaries: Tensor = None, shared_coboundaries: Tensor = None, mapping: Tensor = None,
+                 shared_boundaries: Tensor = None, shared_coboundaries: Tensor = None, mapping: Tensor = None, 
                  boundary_index: Adj = None, upper_orient=None, lower_orient=None, y=None, **kwargs):
         if dim == 0:
             assert lower_index is None
