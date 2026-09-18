@@ -305,11 +305,11 @@ class SMRTComplexDataset(InMemoryComplexDataset):
                 df = pd.read_csv(self.csv_path, sep=r"\s+", names=["smiles", "rt"], header=0, engine="python")
                 
             df = df[df['rt'] > 300.0]
-            print(f"✅ 成功读取数据集，有效分子数: {len(df)}")
+            print(f"✅ The dataset was successfully read. The number of valid molecules: {len(df)}")
             
         except Exception as e:
-            print(f"❌ 读取 CSV 彻底失败: {e}")
-            raise e  # 🚨 必须使用 raise e 强制让程序在这里崩溃，绝对不能用 return！
+            print(f"❌ reed CSV error: {e}")
+            raise e 
             
         data_list = []
         print("Step 1/2: Extracting EXACT ABCoRT Features (Full 46D Atoms, 21D Bonds)...")
